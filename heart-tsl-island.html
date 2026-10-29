@@ -1,0 +1,1308 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>手語心島</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700;900&family=Fraunces:ital,opsz,wght@1,9..144,600;1,9..144,700&display=swap">
+<style>
+/* Layout: full-bleed 3D hex archipelago on the left, a cream study panel docked right (bottom sheet on phones).
+   Deliberately one warm, light look in every viewer theme: peach sky, cream paper, coral accent, butter-yellow rewards. */
+:root{
+  color-scheme:light;
+  --bg:#FFF8F4;          /* cream paper */
+  --card:#FFFFFF;
+  --ink:#211D1D;         /* warm near-black */
+  --muted:#78685E;
+  --line:#F0E2D8;
+  --edge:rgba(33,29,29,.16);
+  --brick:#DB6A41;       /* coral: the one accent */
+  --brick-deep:#B9502C;
+  --brick-ink:#FFFFFF;
+  --stud:#FCDD6B;        /* butter yellow: rewards */
+  --ok:#3E9B5A;
+  --bad:#C9452F;
+  --chip:#FDF0E7;
+  --sky:#F8E4D2;
+  --shadow:0 4px 14px rgba(150,90,50,.13);
+  --f-display:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  --f-body:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif;
+  --f-num:"Fraunces",Georgia,"Times New Roman",serif;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);overflow:hidden}
+#app{display:flex;height:100%}
+#stage{position:relative;flex:1;min-width:0;background:var(--sky);overflow:hidden;touch-action:none}
+#stage canvas{display:block}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--stud);outline-offset:2px}
+
+/* HUD */
+.hud{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));left:max(12px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:10px;pointer-events:none;max-width:calc(100% - 24px)}
+.brand{pointer-events:auto;display:flex;align-items:center;gap:12px;background:var(--card);border-radius:14px;padding:10px 14px;box-shadow:var(--shadow);border:1.5px solid var(--edge);width:max-content;max-width:100%}
+.brand-mark{width:38px;height:38px;flex:none}
+.brand h1{margin:0;font-family:var(--f-display);font-weight:900;font-size:22px;line-height:1.1;letter-spacing:.04em;color:var(--brick)}
+.brand p{margin:2px 0 0;font-size:12px;color:var(--muted)}
+.tools{pointer-events:auto;display:flex;flex-wrap:wrap;gap:6px}
+.tool{display:flex;align-items:center;gap:6px;background:var(--card);border:1.5px solid var(--edge);border-radius:10px;padding:6px 10px;font-size:13px;font-weight:500;box-shadow:var(--shadow)}
+.tool[aria-pressed="true"]{background:var(--brick);color:#fff;border-color:var(--brick)}
+.tool svg{width:16px;height:16px}
+.bricks{position:absolute;top:calc(12px + env(safe-area-inset-top,0px));right:12px;background:var(--card);border:1.5px solid var(--edge);border-radius:12px;padding:6px 12px;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow);font-family:var(--f-num);font-style:italic;font-weight:700;font-size:19px;color:var(--brick)}
+.bricks svg{width:26px;height:20px}
+.hint{position:absolute;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:rgba(33,29,29,.55);color:#fff;font-size:13px;padding:6px 14px;border-radius:99px;pointer-events:none;white-space:nowrap;max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis}
+
+/* labels over 3D */
+#labels{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.pin{position:absolute;transform:translate(-50%,-100%);pointer-events:auto;display:flex;align-items:center;gap:6px;background:#FFF8F4;color:#211D1D;border:1.5px solid rgba(33,29,29,.18);border-radius:99px;padding:3px 10px 3px 4px;font-size:13px;font-weight:700;white-space:nowrap;box-shadow:0 3px 10px rgba(150,90,50,.18)}
+.pin b{font-family:var(--f-num);font-weight:600;color:#fff;border-radius:99px;min-width:22px;height:22px;display:grid;place-items:center;font-size:12px;padding:0 4px}
+.pin i{font-style:italic;font-family:var(--f-num);font-weight:600;color:#DB6A41;font-size:13px}
+.pin.done{background:#FCEA8B}
+.tag{position:absolute;transform:translate(-50%,-100%);font-size:11px;font-weight:700;color:#211D1D;background:rgba(255,255,255,.88);border-radius:6px;padding:1px 6px;white-space:nowrap}
+.tag.me{background:#D7322B;color:#fff}
+.tag.story{background:#DB6A41;color:#fff;font-size:12px;padding:2px 9px;border-radius:99px;box-shadow:0 3px 10px rgba(150,90,50,.25)}
+.hide-tags .tag:not(.me):not(.story){display:none}
+
+/* panel */
+#panel{width:380px;flex:none;display:flex;flex-direction:column;border-left:1.5px solid var(--edge);background:var(--bg);min-height:0}
+.p-head{padding-block:16px 12px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));border-bottom:2px solid var(--line)}
+.eyebrow{font-size:11px;letter-spacing:.14em;color:var(--muted);font-weight:700}
+.p-head h2{font-family:var(--f-display);font-weight:900;font-size:24px;margin:4px 0 6px;text-wrap:balance}
+.meter{height:12px;border-radius:99px;background:var(--chip);border:1.5px solid var(--edge);overflow:hidden}
+.meter span{display:block;height:100%;background:var(--stud);transition:width .5s}
+.meter-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:6px;font-variant-numeric:tabular-nums}
+.tabs{display:flex;gap:6px;margin-top:12px}
+.tab{flex:1;border:1.5px solid var(--edge);background:var(--card);border-radius:10px;padding:7px;font-weight:700;font-size:14px}
+.tab[aria-selected="true"]{background:var(--brick);color:var(--brick-ink);border-color:var(--brick)}
+.tab{color:var(--muted)}
+.tab[aria-selected="true"]{color:#fff}
+.p-body{flex:1;overflow:auto;padding-block:12px 24px;padding-left:max(18px,env(safe-area-inset-left,0px));padding-right:max(18px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:10px;min-height:0}
+.isl{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;text-align:left;background:var(--card);border:2px solid var(--line);border-radius:12px;padding:10px 12px}
+.isl:hover{border-color:var(--brick)}
+.hexnum{width:40px;height:44px;display:grid;place-items:center;color:#fff;font-family:var(--f-num);font-weight:600;font-size:15px;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%)}
+.isl h3{margin:0;font-size:15px;font-family:var(--f-display)}
+.isl small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.dots{display:flex;gap:3px}
+.dots i{width:9px;height:9px;border-radius:2px;background:var(--line)}
+.dots i.on{background:var(--stud);box-shadow:inset 0 -2px 0 rgba(0,0,0,.18)}
+.back{align-self:flex-start;border:none;background:none;color:var(--muted);font-size:13px;padding:0}
+.sec-title{font-family:var(--f-display);font-size:21px;margin:0;text-wrap:balance}
+.meta{font-size:12px;color:var(--muted)}
+.prose{font-size:14.5px;line-height:1.75;margin:0}
+.keylist{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:6px}
+.keylist li{background:var(--card);border:2px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13.5px;line-height:1.55}
+.mnemo{background:var(--card);border:2px dashed var(--brick);border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.7}
+.mnemo b{display:block;font-size:12px;color:var(--brick);letter-spacing:.08em;margin-bottom:2px}
+h4{margin:6px 0 0;font-size:13px;letter-spacing:.08em;color:var(--muted)}
+.res{display:flex;align-items:center;gap:10px;background:var(--card);border:2px solid var(--line);border-radius:12px;padding:8px 10px;text-align:left}
+.res:hover{border-color:var(--brick)}
+.face{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:700;color:#fff;flex:none;font-size:14px;border:2px solid #FFFFFF}
+.res div{flex:1;min-width:0}
+.res strong{font-size:14px}
+.res small{display:block;color:var(--muted);font-size:12px}
+.state{font-size:12px;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--chip);color:var(--muted);white-space:nowrap}
+.state.ok{background:var(--ok);color:#fff}
+.card{background:var(--card);border:2px solid var(--line);border-radius:12px;padding:10px 12px;font-size:13.5px;line-height:1.65}
+.card b{font-size:12px;color:var(--muted);display:block}
+.empty{color:var(--muted);font-size:14px;line-height:1.7;background:var(--card);border:2px dashed var(--line);border-radius:12px;padding:16px}
+
+/* modal */
+.veil{position:fixed;inset:0;background:rgba(80,45,25,.28);display:grid;place-items:center;z-index:50;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.modal{width:min(520px,100%);max-height:calc(100% - 32px);overflow:auto;background:var(--card);color:var(--ink);border:1.5px solid var(--edge);border-radius:18px;box-shadow:0 18px 40px rgba(120,70,40,.25);padding:20px}
+.m-head{display:flex;gap:12px;align-items:center}
+.m-head .face{width:52px;height:52px;font-size:20px}
+.m-head h3{margin:0;font-family:var(--f-display);font-size:20px}
+.m-head small{color:var(--muted)}
+.close{margin-left:auto;border:1.5px solid var(--edge);background:var(--card);border-radius:10px;width:36px;height:36px;font-size:18px;line-height:1}
+.bubble{margin-top:12px;background:var(--chip);border-radius:14px;padding:12px 14px;font-size:15px;line-height:1.7;position:relative}
+.q{margin-top:14px;font-weight:700;font-size:15.5px;line-height:1.6}
+.opts{display:grid;gap:8px;margin-top:10px}
+.opt{text-align:left;border:2px solid var(--line);background:var(--card);border-radius:12px;padding:10px 12px;font-size:14.5px;line-height:1.5}
+.opt:hover{border-color:var(--brick)}
+.opt.right{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,var(--card))}
+.opt.wrong{border-color:var(--bad);animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+.slot{min-height:52px;border:2px dashed var(--line);border-radius:12px;padding:8px;display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+.pool{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.tk{border:1.5px solid #E2B94A;border-bottom-width:4px;background:#FFF3C4;color:#211D1D;border-radius:8px;padding:6px 10px;font-weight:700;font-size:14.5px}
+.slot .tk{background:#FFE1D2;border-color:#E7A98C}
+.tk[disabled]{opacity:.25;cursor:default}
+.row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.btn{border:1.5px solid var(--brick-deep);border-bottom-width:4px;background:var(--brick);color:#fff;border-radius:10px;padding:8px 16px;font-weight:700}
+.btn.ghost{background:var(--card);color:var(--ink)}
+.feedback{margin-top:12px;border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.65}
+.feedback.ok{background:color-mix(in srgb,var(--ok) 15%,var(--card));border:2px solid var(--ok)}
+.feedback.no{background:color-mix(in srgb,var(--bad) 12%,var(--card));border:2px solid var(--bad)}
+.toast{position:fixed;left:50%;top:calc(20px + env(safe-area-inset-top,0px));transform:translateX(-50%);background:var(--stud);color:#211D1D;border:1.5px solid #E2B94A;border-radius:12px;padding:8px 16px;font-weight:700;z-index:60;box-shadow:0 3px 0 rgba(0,0,0,.2);transition:opacity .3s}
+.cert{text-align:center}
+.cert h3{font-family:var(--f-display);font-size:26px;margin:8px 0}
+.cert .seal{width:110px;margin:0 auto}
+.tut-dots{display:flex;gap:6px;justify-content:center;margin-top:12px}
+.tut-dots i{width:8px;height:8px;border-radius:50%;background:var(--line)}
+.tut-dots i.on{background:var(--brick)}
+
+/* opening guide */
+.tut-list{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:8px}
+.tut-list li{display:flex;gap:12px;align-items:flex-start;background:var(--chip);border-radius:12px;padding:9px 12px}
+.tut-ic{width:32px;height:32px;flex:none}
+.tut-ic svg{width:32px;height:32px;display:block}
+.tut-list div{min-width:0}
+.tut-list b{display:block;font-size:14.5px}
+.tut-list span:not(.tut-ic){display:block;font-size:13.5px;line-height:1.6;color:var(--muted)}
+.tut-foot{font-size:12.5px;color:var(--muted);line-height:1.6;margin:10px 0 0}
+
+/* mini-games */
+.reels{display:grid;grid-template-columns:1fr 1.7fr .8fr;gap:8px;margin-top:12px}
+.reel{display:flex;flex-direction:column;gap:4px;text-align:center;min-width:0}
+.reel button{border:1.5px solid var(--edge);background:var(--card);border-radius:8px;padding:3px;font-size:12px}
+.reel .win{background:#FFF3C4;border:1.5px solid #E2B94A;border-radius:10px;min-height:58px;display:grid;place-items:center;font-weight:900;font-size:16px;padding:4px;overflow:hidden;word-break:keep-all}
+.reel .win.spin{animation:spinr .12s linear infinite}
+.reel small{color:var(--muted);font-size:11px;letter-spacing:.08em}
+@keyframes spinr{0%{transform:translateY(-5px);opacity:.55}100%{transform:translateY(5px);opacity:.55}}
+.match{position:relative;display:grid;grid-template-columns:1fr 1fr;column-gap:40px;margin-top:12px}
+.match svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+.mcol{display:flex;flex-direction:column;gap:8px;min-width:0}
+.mcell{border:1.5px solid var(--line);background:var(--card);border-radius:10px;padding:9px 8px;font-size:14px;font-weight:700;text-align:center;min-height:44px}
+.mcell.sel{border-color:var(--brick);background:var(--chip)}
+.mcell.ok{background:var(--chip);cursor:default}
+.mcell.bad{border-color:var(--bad);animation:shake .35s}
+.chat{display:flex;flex-direction:column;gap:8px;margin-top:12px;max-height:260px;overflow:auto;padding:2px}
+.say{max-width:86%;padding:8px 12px;border-radius:14px;font-size:14.5px;line-height:1.55}
+.say small{display:block;font-size:11px;color:var(--muted);font-weight:700}
+.say.them{align-self:flex-start;background:var(--chip);border-top-left-radius:4px}
+.say.me{align-self:flex-end;background:#FFE1D2;border-top-right-radius:4px;animation:pop .35s}
+.say.ctx{align-self:center;background:none;color:var(--muted);font-size:13px;text-align:center;max-width:100%}
+.text-build{background:#FFFDF6;border:1.5px dashed #E2B94A;border-radius:12px;padding:10px 12px;margin-top:12px;font-weight:700;line-height:2;min-height:48px;font-size:14.5px}
+.text-build b{display:block;font-size:12px;color:var(--muted);line-height:1.4}
+.text-build span{display:inline-block;background:#FFF3C4;border-radius:6px;padding:0 7px;margin:2px}
+.text-build span.new{animation:pop .4s}
+@keyframes pop{0%{transform:scale(.6)}70%{transform:scale(1.08)}100%{transform:scale(1)}}
+
+@media (max-width:760px){
+  #app{flex-direction:column}
+  #panel{width:auto;height:44%;border-left:none;border-top:1.5px solid var(--edge)}
+  .brand h1{font-size:18px}.brand p{display:none}.brand-mark{width:30px;height:30px}
+  .tool span{display:none}
+  .p-head h2{font-size:19px}
+  .hint{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<div id="app">
+  <div id="stage">
+    <div id="labels"></div>
+    <div class="hud">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 40 40" aria-hidden="true"><polygon points="20,2 36,11 36,29 20,38 4,29 4,11" fill="#D7322B" stroke="#1B2A38" stroke-width="2.5"/><path d="M20 28c-6-4-9-7-9-10.5a4.5 4.5 0 0 1 9-1.2 4.5 4.5 0 0 1 9 1.2C29 21 26 24 20 28z" fill="#fff"/></svg>
+        <div><h1>手語心島</h1><p>臺灣手語的教與學 · 九座知識島</p></div>
+      </div>
+      <div class="tools" role="toolbar" aria-label="視角與顯示">
+        <button class="tool" id="tTags" aria-pressed="true" title="顯示島民名牌"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="2" y="4" width="12" height="8" rx="2"/></svg><span>名牌</span></button>
+        <button class="tool" id="tFollow" aria-pressed="false" title="鏡頭跟隨你"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="5"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/></svg><span>跟隨</span></button>
+        <button class="tool" id="tTop" aria-pressed="false" title="鳥瞰全島"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 2l6 3-6 3-6-3z M2 8l6 3 6-3 M2 11l6 3 6-3"/></svg><span>鳥瞰</span></button>
+        <button class="tool" id="tPause" aria-pressed="false" title="暫停島民活動"><svg viewBox="0 0 16 16" fill="currentColor"><rect x="4" y="3" width="3" height="10" rx="1"/><rect x="9" y="3" width="3" height="10" rx="1"/></svg><span>暫停</span></button>
+        <button class="tool" id="tTime" aria-pressed="false" title="切換時段"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="8" cy="8" r="3"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3 3l1.4 1.4M11.6 11.6L13 13M3 13l1.4-1.4M11.6 4.4L13 3"/></svg><span id="tTimeL">白天</span></button>
+        <button class="tool" id="tHelp" title="玩法說明"><span style="display:inline">?</span></button>
+      </div>
+    </div>
+    <div class="bricks" title="收集到的積木"><svg viewBox="0 0 26 20"><rect x="1" y="6" width="24" height="13" rx="2" fill="#F2B705" stroke="#1B2A38" stroke-width="1.6"/><rect x="5" y="2" width="6" height="5" rx="1.2" fill="#F2B705" stroke="#1B2A38" stroke-width="1.4"/><rect x="15" y="2" width="6" height="5" rx="1.2" fill="#F2B705" stroke="#1B2A38" stroke-width="1.4"/></svg><span id="brickCount">0/0</span></div>
+    <div class="hint">點地面走路 · 點島民對話 · 拖曳移動視角 · 右鍵旋轉 · 滾輪縮放</div>
+  </div>
+  <aside id="panel" aria-label="學習面板">
+    <div class="p-head">
+      <div class="eyebrow">第六章 · 臺灣手語的教與學</div>
+      <h2>從語言功能出發的九座島</h2>
+      <div class="meter" aria-hidden="true"><span id="meterBar" style="width:0"></span></div>
+      <div class="meter-row"><span id="meterTxt">已學會 0 位島民的知識</span><span id="meterPct">0%</span></div>
+      <div class="tabs" role="tablist">
+        <button class="tab" role="tab" id="tabIsl" aria-selected="true">島嶼</button>
+        <button class="tab" role="tab" id="tabLog" aria-selected="false">學習日誌</button>
+      </div>
+    </div>
+    <div class="p-body" id="pBody"></div>
+  </aside>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+/* ============ 內容資料：取自〈第六章 臺灣手語的教與學〉 ============ */
+const ISLANDS = [
+  {no:"一",name:"政策港",title:"臺灣手語成為部定課程之後",page:"p.188",color:"#D7322B",top:"#F8E6B8",lm:"hall",
+   summary:"108年《國家語言發展法》公布施行，臺灣手語成為國家語言之一，並自111學年度起進入國民基本教育。手語進入學校後，真正的挑戰才開始：臺灣手語是自然語言，也是視覺語言，有自己的詞彙、語法、空間結構、非手勢標記、篇章組織與文化慣例。",
+   points:["108年1月8日《國家語言發展法》公布施行","110年 教育部發布課綱「語文領域—臺灣手語」","111學年度起依教育階段逐年實施","手語教學不是記手勢，也不是把華語逐字換成手語"],
+   tipT:"本島關鍵句",tip:"臺灣手語是一種自然語言，也是一種視覺語言。"},
+  {no:"二",name:"功能燈塔",title:"為什麼要從語言功能出發",page:"p.189–191",color:"#1F6FD1",top:"#C2E58F",lm:"lighthouse",
+   summary:"語言功能是人在不同情境中使用語言要完成的溝通目的。華語是聽覺—口語語言，臺灣手語是視覺—動作語言，訊息接收與傳遞條件都不同。教學應先問「這個情境中，說話者想完成什麼溝通功能」，而不是「這句華語怎麼打」。",
+   points:["訊息接收：華語靠耳朵，手語靠眼睛","訊息傳遞：手形、位置、動作、掌心方向、臉部表情、身體姿勢","溝通條件：需要光線與適當的距離","三核心策略：主題掌握、脈絡化教學、情境引導"],
+   tipT:"教師提醒",tip:"不建議先把華語句子寫好，再要求學生逐字打成手語。先設定情境與語言功能，再引導學生用臺灣手語自然表達。"},
+  {no:"三",name:"家人村",title:"詞彙教學",page:"p.192–195",color:"#F2B705",top:"#B6DE80",lm:"houses",
+   summary:"詞彙不應被當成孤立的手勢來教。臺灣手語的詞彙常與動作、形狀、位置、視覺特徵或文化慣例有關，所以要同時處理「形式」與「意義」。國小以「我的家人」、國中以「雞蛋與瓦片」為例。",
+   points:["四步驟：進入情境 → 問答引出 → 形式校準 → 擴大應用","華語「辛苦地工作」，手語打「工作 辛苦」","華語「努力地讀書」，手語打「讀書 努力」","長課文先切割情境，再依情境群組帶出詞彙"],
+   tipT:"詞彙教學口訣",tip:"情境聯想不零散，形式意義相連結；校準形式不馬虎，詞組加入增記憶。"},
+  {no:"四",name:"句型市場",title:"句型與對話教學",page:"p.196–198",color:"#2E9E4F",top:"#F8E6B8",lm:"market",
+   summary:"句型教學不是背固定格式，而是讓學生知道這個句型能完成什麼語言功能。先說明情境與功能，再帶入結構與例句，最後讓句型進入連續的對話互動。",
+   points:["沒有意願：人＋做某事＋不（弟弟 服藥 按時 不）","叮嚀要求：…＋做某事＋要（搭配確定的臉部表情）","個性不同：人1＋人2＋他們兩個＋個性/興趣＋不一樣","對話三步驟：說明情境 → 分配角色 → 替換重組"],
+   tipT:"句型與對話教學口訣",tip:"句型結構不打散，情境運用要類推；對話扮演多視角，相輔相成能搭配。"},
+  {no:"五",name:"課文圖書館",title:"課文教學",page:"p.199–201",color:"#7D4CB7",top:"#C2E58F",lm:"library",
+   summary:"課文教學最容易變成教師一句一句示範、學生一句一句跟打。應以情境引導為核心，透過問答、角色扮演、替換練習與轉述理解課文。低級別用「語句拆合」，高級別掌握段落功能。",
+   points:["三步驟：解析主題情境與功能 → 找出重要句型 → 運用情境引導","語句拆合：先拆成小單位，再逐步合併成完整課文","〈雞蛋與瓦片〉四段落：人物介紹、買雞蛋、被誤會、屋頂事件","讓學生從不同角色視角轉述故事"],
+   tipT:"課文教學口訣",tip:"課文結構先理解，情境功能都分明；句型結構增應用，問句描述引內容。"},
+  {no:"六",name:"活動遊樂園",title:"綜合活動教學",page:"p.202–203",color:"#F07F1A",top:"#B6DE80",lm:"wheel",
+   summary:"綜合活動不是課後練習，而是檢視學生是否真正理解詞彙、句型與課文的機會。重點是讓學生從「看懂」走向「能表達」，再走向「能互動」。同一班程度不同時，用差異化任務讓每個人都有進步路徑。",
+   points:["連連看：建立手語形式與情境意義的連結","看圖回答問題：觀察情境並用手語回答","對話練習：培養連續互動能力","看圖說故事：整合詞彙、句型、時間順序與篇章"],
+   tipT:"綜合活動口訣",tip:"形式意義多關聯，理解表達相輔助；圖文情境說分明，句型對話沒問題。"},
+  {no:"七",name:"聾人文化村",title:"聾人文化教學",page:"p.204–206",color:"#12A0A8",top:"#C2E58F",lm:"village",
+   summary:"聾人文化不是課本最後的補充材料，而是理解臺灣手語的重要背景。表達慣例、互動禮節與生活科技，都和視覺語言的特性密切相關。",
+   points:["「減 瘦」＝減肥；「出生 家」＝老家；「你 臉 誰？」＝你的手語名字是什麼？","叫聾人朋友：走到視線範圍內揮手，不從背後大喊","手語對話要保持眼神接觸、避免背光、保持適當距離","閃光門鈴、震動鬧鐘、視訊手語服務回應生活需求"],
+   tipT:"本島關鍵句",tip:"文化差異不只是抽象觀念，而是日常生活中具體可見的安排。"},
+  {no:"八",name:"評量觀測站",title:"學習評量與教師反思",page:"p.207–208",color:"#E25C9A",top:"#B6DE80",lm:"observatory",
+   summary:"評量不只看學生會不會打某個詞，也要觀察能否在情境中理解、表達與互動。會打手語不等於會教手語，教師需要持續反思自己的教學。",
+   points:["理解能力：看懂詞彙、句子、課文與對話","形式準確度：手形、位置、動作、掌心方向、表情","表達能力／互動能力：依情境使用句型、輪流對話、維持視線","文化理解：聾人互動禮節與表達慣例"],
+   tipT:"教師自我檢核",tip:"語言功能是否清楚？詞彙和句型是否放在情境中？學生是否有表達和互動機會？是否連結到聾人文化或真實使用情境？"},
+  {no:"九",name:"心島",title:"結語",page:"p.209",color:"#E0393E",top:"#FFFFFF",lm:"heart",center:true,
+   summary:"臺灣手語教學不能停留在詞彙記憶，也不能把華語句子逐字轉成手語。有效的教學從語言功能出發，透過主題掌握、脈絡化教學與情境引導，讓學生在具體情境中理解形式與意義，逐步發展理解、表達與互動能力。",
+   points:["教師不只示範打法，也帶領學生理解視覺語言","建立跨文化溝通能力","以更尊重的方式進入聾人社群與視覺語言文化"],
+   tipT:"結語",tip:"會打手語是成為手語教師的基礎；要教好臺灣手語，還需要理解語言結構、教學設計、學生程度、聾人文化與課堂互動。"}
+];
+
+const R = (island,name,role,look,say,q)=>({island,name,role,look,say,q});
+const mc=(prompt,options,answer,explain)=>({type:"mc",prompt,options,answer,explain});
+const od=(prompt,tokens,explain)=>({type:"order",prompt,tokens,explain});
+const RESIDENTS = [
+  R(0,"法條阿伯","港口公告員",["#1F6FD1","#1B2A38","#8B8B8B"],"108年1月8日，總統公布施行《國家語言發展法》。從那天起，臺灣手語是國家語言之一！",
+    mc("臺灣手語是依哪一部法律，被明定為國家語言之一？",["《國家語言發展法》","《特殊教育法》","《國民教育法》","《身心障礙者權益保障法》"],0,"《國家語言發展法》於108年1月8日公布施行，臺灣手語被明定為國家語言之一。（p.188）")),
+  R(0,"課綱小姐","學校信差",["#E25C9A","#F3F3F3","#4A2C1A"],"教育部110年發布了課綱的臺灣手語部分，接下來就是走進教室了。",
+    mc("「語文領域—臺灣手語」課綱從哪一學年度起，依教育階段逐年實施？",["109學年度","110學年度","111學年度","112學年度"],2,"教育部110年發布課綱，111學年度起依不同教育階段逐年實施。（p.188）")),
+  R(0,"迷思先生","旅人",["#8B8B8B","#4A3A2A","#1B1B1B"],"我一直以為，手語教學就是把華語句子一個字一個字換成手勢……",
+    mc("關於臺灣手語，哪個說法正確？",["只要記住手勢就學會了","把華語句子逐字換成手語即可","是自然語言也是視覺語言，有自己的詞彙、語法與空間結構","只是聾人社群內部的溝通方式，不必正式學習"],2,"臺灣手語有自己的詞彙、語法、空間結構、非手勢標記、篇章組織與文化慣例，不能把華語語法直接套入。（p.188）")),
+
+  R(1,"燈塔阿姨","守塔人",["#F3F3F3","#1F6FD1","#C0392B"],"語言功能，就是在某個情境裡要完成的溝通目的，像介紹自己、詢問地點、說明原因。",
+    mc("下列哪一項屬於「語言功能」？",["描述家人","背出手形編號","記住課文頁碼","逐字對照華語"],0,"語言功能是在情境中使用語言要完成的溝通目的，例如介紹自己、描述家人、詢問地點、比較差異、敘述事件。（p.189）")),
+  R(1,"眼睛博士","觀測員",["#12A0A8","#1B2A38","#F3F3F3"],"華語靠耳朵接收，臺灣手語靠眼睛。所以溝通條件也不一樣喔。",
+    mc("用臺灣手語溝通，最需要具備哪項條件？",["安靜沒有噪音","光線與適當的距離","清楚的麥克風","說話者音量夠大"],1,"臺灣手語是視覺—動作語言，訊息靠眼睛接收，需要光線與適當的距離。（p.189）")),
+  R(1,"書桌小弟","學生",["#F2B705","#1F6FD1","#1B1B1B"],"華語說「書在桌子上」，那個「上」要怎麼打呢？",
+    mc("臺灣手語常怎麼表達「書在桌子上」的位置關係？",["一定要先打一個相當於「上」的詞","利用手語空間結構，直接呈現書與桌子的相對位置","用指拼拼出「上」","先寫字再比手勢"],1,"臺灣手語可直接利用空間結構呈現相對位置，不一定需要另用相當於「上」的詞。（p.190）")),
+  R(1,"策略船長","船長",["#1B2A38","#1B2A38","#F3F3F3"],"設計課程有三個核心策略，它們互相支撐，不是三個分開的步驟。",
+    mc("下列哪一項「不是」課程設計的三個核心策略？",["主題掌握","脈絡化教學","情境引導","華語逐字轉換"],3,"三核心策略是主題掌握、脈絡化教學與情境引導，是相互支撐的教學思維。（p.190–191）")),
+
+  R(2,"爸爸","上班族",["#1F6FD1","#2B2B2B","#1B1B1B"],"我和媽媽每天都很辛苦地工作。用臺灣手語的語序排排看！",
+    od("華語：「爸爸、媽媽辛苦地工作。」\n請排出臺灣手語文本：",["爸爸","媽媽","工作","辛苦"],"臺灣手語說「工作 辛苦」：修飾動作狀態的詞可放在動作之後。（p.193–194）")),
+  R(2,"哥哥","高中生",["#2E9E4F","#1F3A6B","#3B2414"],"我每天都努力讀書！可是手語的順序跟華語不一樣喔。",
+    od("華語：「哥哥努力地讀書。」\n請排出臺灣手語文本：",["哥哥","讀書","努力"],"要打「讀書 努力」，不要求學生照華語排成「努力 讀書」。（p.194）")),
+  R(2,"詞彙老師","國小老師",["#7D4CB7","#2B2B2B","#6B3E1E"],"教詞彙不要一開始就逐詞示範。先讓詞彙在情境裡自然出現。",
+    od("把詞彙教學的四個步驟排好：",["進入情境","問答引出","形式校準","擴大應用"],"四步驟：進入情境 → 問答引出 → 形式校準 → 擴大應用。（p.192）")),
+  R(2,"阿湯","國中生",["#F07F1A","#1F3A6B","#1B1B1B"],"我們的課文〈雞蛋與瓦片〉好長，有買雞蛋、被誤會、上屋頂看海、踩破瓦片……",
+    mc("國中長課文的詞彙教學，應該怎麼做？",["一次把所有詞彙灌入","先切割課文情境，再依情境群組帶出詞彙","只教最難的詞","讓學生自己查字典"],1,"高級別詞彙教學要讓詞彙和篇章事件保持連結：先簡述故事，再切成小情境學詞彙。（p.194–195）")),
+
+  R(3,"弟弟","感冒中",["#F2B705","#2E9E4F","#3B2414"],"我生病好幾天了……但我就是不想按時吃藥。",
+    od("華語：「弟弟不按時服藥。」\n句型：人＋做某事＋不",["弟弟","服藥","按時","不"],"句型「人＋做某事＋不」表達沒有意願做某事，可替換成「弟弟 睡覺 不」。（p.196）")),
+  R(3,"媽媽","菜市場常客",["#E25C9A","#2B2B2B","#1B1B1B"],"疫情期間，我叮嚀爸爸一定要戴口罩！",
+    mc("「爸爸 媽媽 叮嚀(爸爸) 戴口罩 要」句末的「要」，需要搭配什麼？",["疑問的表情","確定的臉部表情","不需要任何表情","驚訝的表情"],1,"叮嚀句型的「要」需搭配確定的臉部表情形成語氣，也要讓學生知道誰叮嚀誰。（p.197）")),
+  R(3,"市場朋友","鄰居",["#12A0A8","#4A3A2A","#8B5A2B"],"他們兩個看起來個性一樣？其實完全不一樣！",
+    od("華語：「哥哥和弟弟兩人個性很不一樣。」",["哥哥","弟弟","他們兩個","個性","不一樣"],"句型：人1＋人2＋他們兩個＋個性/興趣＋不一樣。（p.197）")),
+  R(3,"對話教練","攤販",["#D7322B","#1B2A38","#F3F3F3"],"只會打單一句子不夠，要能在連續互動裡用句型。",
+    od("排出對話練習的三個步驟：",["說明對話情境","分配角色練習","替換人物或個性重組對話"],"對話練習三步驟：說明情境 → 分配角色 → 替換人物、個性或興趣重新組合。（p.198）")),
+
+  R(4,"館長","圖書館員",["#7D4CB7","#1B2A38","#C9C9C9"],"課文不是一句一句跟著打就好，要真的理解內容。",
+    od("排出課文教學的三個步驟：",["解析主題、情境與功能","找出重要句型或結構","運用情境引導"],"課文教學三步驟：解析主題情境與功能 → 找出重要句型 → 運用情境引導。（p.199）")),
+  R(4,"拆合師傅","裝訂師",["#F07F1A","#4A3A2A","#1B1B1B"],"「爸爸辛苦地做什麼？」「媽媽呢？」「爸爸媽媽呢？」一步步問，句子就長出來了。",
+    mc("先把長句拆成容易回答的小單位，再逐步合併成完整課文，這叫做？",["逐句示範","語句拆合","看圖說故事","形式校準"],1,"「語句拆合」讓學生在情境中理解、回答、組合與表達，不只是模仿。（p.200）")),
+  R(4,"奶奶","說故事的人",["#C9C9C9","#7D4CB7","#F3F3F3"],"高級別課文篇幅長，有事件、角色、情緒和空間的轉折。",
+    mc("高級別課文教學的重點是？",["逐句細講每個詞","幫助學生掌握段落功能","只看影片不討論","跳過情緒描寫"],1,"可把〈雞蛋與瓦片〉分成人物介紹、買雞蛋、被誤會、屋頂事件四個段落功能。（p.200）")),
+  R(4,"旁觀者","路人",["#8B8B8B","#2B2B2B","#3B2414"],"同一個故事，從我的角度看又不一樣了。",
+    mc("讓學生從哥哥、弟弟、奶奶或旁觀者的角度重新說故事，主要能強化什麼？",["打手語的速度","對角色、事件、因果與篇章銜接的理解","背誦能力","華語作文能力"],1,"不同視角轉述能強化學生對角色、事件、因果與篇章銜接的理解。（p.201）")),
+
+  R(5,"連連看小丑","活動主持",["#D7322B","#F2B705","#F07F1A"],"歡迎光臨！第一關：連連看！",
+    mc("「連連看」活動的主要目的是？",["建立手語形式與情境意義的連結","練習打字速度","比賽誰最快","複習注音符號"],0,"連連看可搭配圖片、手語影片或教師示範，建立形式與意義的連結。（p.202）")),
+  R(5,"說書姐姐","故事屋",["#2E9E4F","#F3F3F3","#1B1B1B"],"今天的圖：弟弟生病了，但不想去看醫生。你能說出整個故事嗎？",
+    mc("哪一種活動最能整合詞彙、句型、時間順序與篇章表達？",["連連看","看圖說故事","句型練習","表達練習"],1,"看圖說故事：教師先提供主問題，再讓學生完整敘述。（p.202）")),
+  R(5,"摩天輪管理員","設施員",["#1F6FD1","#2B2B2B","#F2B705"],"一圈一圈往上，學手語也是一步一步往上。",
+    od("綜合活動要讓學生一步步走向：",["看懂","能表達","能互動"],"綜合活動的重點，是讓學生從「看懂」走向「能表達」，再走向「能互動」。（p.203）")),
+  R(5,"差異化老師","班導",["#12A0A8","#1B2A38","#6B3E1E"],"我們班有人學過手語，也有人完全沒基礎。",
+    mc("差異化教學是指？",["降低標準讓大家都過","在相同主題與語言功能下，讓不同程度的學生都找到可進步的路徑","分成不同主題各教各的","只照顧程度好的學生"],1,"差異化不是降低標準：初學者從選圖、簡短回答開始；程度好的做角色扮演、看圖說故事。（p.203）")),
+
+  R(6,"小美","聾人學生",["#E25C9A","#1F3A6B","#1B1B1B"],"嗨！我先問你：你 臉 誰？",
+    mc("臺灣手語「你 臉 誰？」是什麼意思？",["你的臉怎麼了？","你的手語名字是什麼？","你是誰的家人？","你認識誰？"],1,"手語名字常與人的外貌特徵或臉部記憶點有關。（p.204）")),
+  R(6,"健身阿伯","晨跑隊",["#F07F1A","#1B2A38","#C9C9C9"],"我最近在「減 瘦」！",
+    mc("臺灣手語「減 瘦」（減肥）強調的是哪種概念？",["因為肥所以要減","減而瘦之","少吃一餐","運動流汗"],1,"華語強調因肥而減，臺灣手語強調減而瘦之。兩種語言取用的概念面向不同。（p.204）")),
+  R(6,"門鈴阿姨","雜貨店老闆",["#2E9E4F","#4A3A2A","#3B2414"],"我家的門鈴不會響，它會閃光！你看那盞燈。",
+    mc("聾人家庭常用什麼方式知道有人按門鈴？",["閃光門鈴","更大聲的門鈴","請鄰居幫忙喊","裝錄音監視器"],0,"閃光門鈴、震動鬧鐘、視訊手語服務，都是回應聾人生活需求的科技。（p.205–206）")),
+  R(6,"禮節大使","社區志工",["#1F6FD1","#F3F3F3","#1B1B1B"],"與聾人互動要注意視覺語言的溝通條件。",
+    mc("想叫一位背對你的聾人朋友，較合適的做法是？",["從背後大喊","丟東西引起注意","走到對方視線範圍內揮手，或請旁人幫忙提醒","用力拍他的背"],2,"不應站在背後大聲喊叫，也不宜丟物品；走到面前、揮手示意或請旁人提醒。（p.205）")),
+  R(6,"燈光師","劇場工作者",["#1B2A38","#1B2A38","#F2B705"],"站在窗戶前面打手語？對方只會看到一團黑影。",
+    mc("光線不足時打手語，較合適的做法是？",["站在背光處繼續打","調整位置，讓臉部與手部清楚可見","打快一點","改用寫字就好"],1,"手語溝通要避免背光，並保持適當距離，讓對方看清手形、動作與臉部表情。（p.205）")),
+
+  R(7,"觀測員","評量研究員",["#E25C9A","#1B2A38","#3B2414"],"評量要從好幾個面向觀察學生。",
+    mc("「能否輪流對話、回應問題、維持視線」屬於哪一個評量面向？",["理解能力","形式準確度","互動能力","文化理解"],2,"互動能力可用角色扮演、小組對話來評量。（p.207）")),
+  R(7,"形式檢查員","助教",["#F2B705","#2B2B2B","#1B1B1B"],"打得清不清楚，我有一張檢查表。",
+    mc("評量「形式準確度」時，要觀察什麼？",["手形、位置、動作、掌心方向、表情","華語作文","背了幾個單字","打得多快"],0,"形式準確度可用教師觀察、同儕回饋、影片檢視來評量。（p.207）")),
+  R(7,"夜間觀星人","資深教師",["#1B2A38","#7D4CB7","#C9C9C9"],"會打手語不等於會教手語。我每堂課都會問自己四件事。",
+    mc("下列哪一項「不在」教師每堂課的自我檢核四件事中？",["本課語言功能是否清楚","詞彙和句型是否放在情境中","學生是否背熟所有手形編號","是否連結到聾人文化或真實使用情境"],2,"四件事：語言功能、情境中的詞彙句型、表達與互動機會、聾人文化與真實情境。（p.208）")),
+
+  R(8,"島主","心島守護者",["#E0393E","#F3F3F3","#F2B705"],"你走遍了八座島。最後一個問題，也是整章的核心。",
+    mc("根據本章，真正有效的臺灣手語教學必須從哪裡出發？",["詞彙記憶","語言功能","華語句型","手形分類"],1,"從語言功能出發，透過主題掌握、脈絡化教學與情境引導，讓學生在具體情境中理解形式與意義。（p.209）"))
+];
+RESIDENTS.forEach((r,i)=>r.id="r"+i);
+const FINAL = RESIDENTS.length-1;
+
+/* ============ 進度 ============ */
+const STORE="tsl-heart-island-v1";
+let prog={done:{},tut:false,story:0,games:{}};
+try{const s=JSON.parse(localStorage.getItem(STORE)||"null"); if(s) prog=Object.assign(prog,s);}catch(e){}
+function save(){try{localStorage.setItem(STORE,JSON.stringify(prog))}catch(e){}}
+const isDone=r=>!!prog.done[r.id];
+const ringTotal=RESIDENTS.length-1;
+const ringDone=()=>RESIDENTS.filter((r,i)=>i!==FINAL&&isDone(r)).length;
+const isLocked=r=>r.island===8 && ringDone()<ringTotal;
+
+/* ============ 六角格 ============ */
+const SQ3=Math.sqrt(3), DIRS=[[1,0],[1,-1],[0,-1],[-1,0],[-1,1],[0,1]];
+const K=(q,r)=>q+","+r;
+const toW=(q,r)=>({x:SQ3*(q+r/2), z:1.5*r});
+const hdist=(a,b)=>(Math.abs(a.q-b.q)+Math.abs(a.q+a.r-b.q-b.r)+Math.abs(a.r-b.r))/2;
+function ring(c,rad){const out=[];let q=c.q+DIRS[4][0]*rad,r=c.r+DIRS[4][1]*rad;for(let i=0;i<6;i++)for(let j=0;j<rad;j++){out.push({q,r});q+=DIRS[i][0];r+=DIRS[i][1];}return out;}
+function spiral(c,rad){let o=[{q:c.q,r:c.r}];for(let k=1;k<=rad;k++)o=o.concat(ring(c,k));return o;}
+function cround(x,y,z){let rx=Math.round(x),ry=Math.round(y),rz=Math.round(z);const dx=Math.abs(rx-x),dy=Math.abs(ry-y),dz=Math.abs(rz-z);if(dx>dy&&dx>dz)rx=-ry-rz;else if(dy>dz)ry=-rx-rz;else rz=-rx-ry;return{q:rx,r:rz};}
+function hline(a,b){const n=hdist(a,b),o=[];for(let i=0;i<=n;i++){const t=n?i/n:0;const ax=a.q,az=a.r,ay=-ax-az,bx=b.q,bz=b.r,by=-bx-bz;o.push(cround(ax+(bx-ax)*t+1e-6,ay+(by-ay)*t+1e-6,az+(bz-az)*t-2e-6));}return o;}
+
+const tiles=new Map();
+const centers=[];
+const ringCells=ring({q:0,r:0},8);
+for(let i=0;i<8;i++) centers.push(ringCells[Math.round(i*6)%48]);
+centers.push({q:0,r:0});
+// rotate so 第一節 sits at the top-left of view
+let seed=7; const rnd=()=>{seed=(seed*16807)%2147483647;return (seed-1)/2147483646;};
+centers.forEach((c,i)=>{
+  spiral(c,2).forEach((h,j)=>{
+    tiles.set(K(h.q,h.r),{q:h.q,r:h.r,island:i,bridge:false,h:(ISLANDS[i].center?0.85:0.6)+(j===0?0.15:Math.floor(rnd()*3)*0.08)});
+  });
+});
+function bridge(a,b){hline(a,b).forEach(h=>{const k=K(h.q,h.r);if(!tiles.has(k))tiles.set(k,{q:h.q,r:h.r,island:-1,bridge:true,h:0.34});});}
+for(let i=0;i<8;i++) bridge(centers[i],centers[(i+1)%8]);
+[0,2,4,6].forEach(i=>bridge(centers[8],centers[i]));
+// landmark center tiles block walking
+const blocked=new Set(centers.map(c=>K(c.q,c.r)));
+const walk=t=>!blocked.has(K(t.q,t.r));
+function nbrs(t){return DIRS.map(d=>tiles.get(K(t.q+d[0],t.r+d[1]))).filter(Boolean);}
+function bfs(from,to,ok=walk){
+  const fk=K(from.q,from.r),tk=K(to.q,to.r); if(fk===tk) return [from];
+  const prev=new Map([[fk,null]]),qu=[from];
+  while(qu.length){const c=qu.shift();for(const n of nbrs(c)){const nk=K(n.q,n.r);if(prev.has(nk)||!ok(n))continue;prev.set(nk,c);if(nk===tk){const p=[n];let x=c;while(x){p.unshift(x);x=prev.get(K(x.q,x.r));}return p;}qu.push(n);}}
+  return null;
+}
+
+/* ============ three.js 場景 ============ */
+const stage=document.getElementById("stage"), labelsEl=document.getElementById("labels");
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.shadowMap.enabled=true; renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+stage.prepend(renderer.domElement);
+const scene=new THREE.Scene();
+scene.background=new THREE.Color("#F8E4D2"); scene.fog=new THREE.Fog("#F8E4D2",60,120);
+const camera=new THREE.PerspectiveCamera(38,1,0.1,300);
+camera.position.set(0,38,44);
+const controls=new THREE.OrbitControls(camera,renderer.domElement);
+controls.target.set(0,0,1); controls.enableDamping=true; controls.dampingFactor=0.08;
+controls.screenSpacePanning=false; controls.maxPolarAngle=1.22; controls.minDistance=7; controls.maxDistance=75;
+controls.mouseButtons={LEFT:THREE.MOUSE.PAN,MIDDLE:THREE.MOUSE.DOLLY,RIGHT:THREE.MOUSE.ROTATE};
+controls.touches={ONE:THREE.TOUCH.PAN,TWO:THREE.TOUCH.DOLLY_ROTATE};
+
+const hemi=new THREE.HemisphereLight("#FFF6EA","#D9B99A",0.95); scene.add(hemi);
+const sun=new THREE.DirectionalLight("#FFE9CF",1.1); sun.position.set(-18,30,14);
+sun.castShadow=true; sun.shadow.mapSize.set(2048,2048);
+Object.assign(sun.shadow.camera,{left:-26,right:26,top:26,bottom:-26,near:1,far:90}); sun.shadow.bias=-0.0008;
+scene.add(sun);
+
+const matCache={};
+const M=(c,o={})=>{const k=c+JSON.stringify(o);return matCache[k]||(matCache[k]=new THREE.MeshStandardMaterial(Object.assign({color:c,roughness:0.42,metalness:0},o)));};
+const studGeo=new THREE.CylinderGeometry(0.075,0.075,0.07,14);
+function mesh(geo,mat,x=0,y=0,z=0,parent){const m=new THREE.Mesh(geo,mat);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;if(parent)parent.add(m);return m;}
+// a lego brick: w × h × d, bottom at y
+function brick(g,w,h,d,color,x,y,z,studs=true){
+  mesh(new THREE.BoxGeometry(w,h,d),M(color),x,y+h/2,z,g);
+  if(!studs) return;
+  const nx=Math.max(1,Math.round(w/0.24)),nz=Math.max(1,Math.round(d/0.24));
+  for(let i=0;i<nx;i++)for(let j=0;j<nz;j++) mesh(studGeo,M(color),x-w/2+(i+0.5)*w/nx,y+h+0.035,z-d/2+(j+0.5)*d/nz,g);
+}
+
+// water + shallows
+const water=mesh(new THREE.CircleGeometry(120,64),M("#5EC4CC",{roughness:0.25}),0,0,0,scene);
+water.rotation.x=-Math.PI/2; water.castShadow=false;
+centers.forEach((c,i)=>{const p=toW(c.q,c.r);const s=mesh(new THREE.CylinderGeometry(4.9,4.9,0.04,6,1,false,Math.PI/6),M("#A9E6DC",{roughness:0.3}),p.x,0.02,p.z,scene);s.castShadow=false;});
+
+// tiles
+const tileMeshes=[];
+const geoCache={};
+const studPositions=[];
+const sideBridge=M("#9A6B3F"),topBridge=M("#C8955C");
+tiles.forEach(t=>{
+  const p=toW(t.q,t.r);
+  const g=geoCache[t.h]||(geoCache[t.h]=new THREE.CylinderGeometry(0.97,0.97,t.h,6));
+  let mats, topColor;
+  if(t.bridge){mats=[sideBridge,topBridge,sideBridge];topColor="#C8955C";}
+  else{const I=ISLANDS[t.island];topColor=I.top;mats=[M(I.color),M(I.top),M(I.color)];}
+  const m=mesh(g,mats,p.x,t.h/2,p.z,scene);
+  m.userData.tile=t; t.mesh=m; t.top=t.h; t.wx=p.x; t.wz=p.z;
+  tileMeshes.push(m);
+  const pts=t.bridge?[[0,0]]:[[0,0]].concat([0,1,2,3,4,5].map(a=>[Math.sin(a*Math.PI/3+Math.PI/6)*0.52,Math.cos(a*Math.PI/3+Math.PI/6)*0.52]));
+  pts.forEach(([dx,dz])=>studPositions.push([p.x+dx,t.h+0.04,p.z+dz,topColor]));
+});
+const studGeoBig=new THREE.CylinderGeometry(0.15,0.15,0.08,16);
+const studInst=new THREE.InstancedMesh(studGeoBig,new THREE.MeshStandardMaterial({roughness:0.4}),studPositions.length);
+const dm=new THREE.Object3D(), col=new THREE.Color();
+studPositions.forEach((s,i)=>{dm.position.set(s[0],s[1],s[2]);dm.updateMatrix();studInst.setMatrixAt(i,dm.matrix);studInst.setColorAt(i,col.set(s[3]));});
+studInst.castShadow=true; studInst.receiveShadow=true; scene.add(studInst);
+
+/* landmarks */
+const animated=[];
+function roofPrism(g,w,d,h,color,x,y,z){const s=new THREE.Shape();s.moveTo(-w/2,0);s.lineTo(w/2,0);s.lineTo(0,h);s.lineTo(-w/2,0);const geo=new THREE.ExtrudeGeometry(s,{depth:d,bevelEnabled:false});geo.translate(0,0,-d/2);mesh(geo,M(color),x,y,z,g);}
+function house(g,x,z,wall,roof,y){brick(g,0.8,0.55,0.7,wall,x,y,z,false);mesh(new THREE.BoxGeometry(0.18,0.3,0.02),M("#6B3E1E"),x,y+0.15,z+0.36,g);mesh(new THREE.BoxGeometry(0.16,0.14,0.02),M("#BFE6FF",{emissive:"#000"}),x+0.24,y+0.34,z+0.36,g);roofPrism(g,0.95,0.8,0.42,roof,x,y+0.55,z);}
+function tree(g,x,z,y,s=1){mesh(new THREE.CylinderGeometry(0.07*s,0.09*s,0.3*s,8),M("#7A4A26"),x,y+0.15*s,z,g);const c=["#3FA34D","#56B95C","#2F8F45"][Math.floor(rnd()*3)];mesh(new THREE.ConeGeometry(0.34*s,0.5*s,8),M(c),x,y+0.48*s,z,g);mesh(new THREE.ConeGeometry(0.25*s,0.4*s,8),M(c),x,y+0.75*s,z,g);}
+const LM={
+  hall(g,y,I){brick(g,1.5,0.18,1.2,"#F3F3F3",0,y,0);for(let i=-2;i<=2;i++)mesh(new THREE.CylinderGeometry(0.06,0.06,0.6,10),M("#F3F3F3"),i*0.3,y+0.48,0.45,g);brick(g,1.3,0.6,0.7,"#F3F3F3",0,y+0.18,-0.15,false);brick(g,1.5,0.14,1.2,I.color,0,y+0.78,0,false);roofPrism(g,1.55,1.2,0.42,I.color,0,y+0.92,0);mesh(new THREE.CylinderGeometry(0.025,0.025,1.1,6),M("#888"),0.55,y+1.45,-0.3,g);const f=mesh(new THREE.BoxGeometry(0.42,0.26,0.02),M("#F2B705"),0.77,y+1.85,-0.3,g);animated.push(t=>{f.rotation.y=Math.sin(t*3)*0.25;});},
+  lighthouse(g,y,I){for(let i=0;i<5;i++)mesh(new THREE.CylinderGeometry(0.42-i*0.05,0.45-i*0.05,0.38,16),M(i%2?"#F3F3F3":I.color),0,y+0.19+i*0.38,0,g);const lamp=mesh(new THREE.SphereGeometry(0.2,16,12),M("#FFE48A",{emissive:"#FFC93C",emissiveIntensity:0.6}),0,y+2.12,0,g);mesh(new THREE.ConeGeometry(0.3,0.3,16),M("#1B2A38"),0,y+2.45,0,g);const beam=new THREE.Mesh(new THREE.ConeGeometry(0.5,4,16,1,true),new THREE.MeshBasicMaterial({color:"#FFF2B0",transparent:true,opacity:0.18,side:THREE.DoubleSide,depthWrite:false}));beam.geometry.translate(0,-2,0);beam.rotation.z=Math.PI/2;const piv=new THREE.Group();piv.position.set(0,y+2.12,0);piv.add(beam);g.add(piv);animated.push(t=>{piv.rotation.y=t*0.9;beam.material.opacity=(scene.userData.night?0.4:0.14);lamp.material.emissiveIntensity=scene.userData.night?1.4:0.6;});},
+  houses(g,y,I){house(g,-0.28,0.1,"#FFF1C9",I.color,y);house(g,0.42,-0.25,"#F7D7D7","#1F6FD1",y);},
+  market(g,y,I){const cs=[["#D7322B","#F3F3F3"],["#1F6FD1","#F3F3F3"],["#F2B705","#F3F3F3"]];[[-0.45,0.2],[0.45,0.2],[0,-0.42]].forEach(([x,z],i)=>{brick(g,0.6,0.32,0.4,"#B07A45",x,y,z);for(let k=0;k<4;k++)mesh(new THREE.BoxGeometry(0.15,0.04,0.5),M(cs[i][k%2]),x-0.225+k*0.15,y+0.82,z,g);[-0.27,0.27].forEach(dx=>mesh(new THREE.CylinderGeometry(0.02,0.02,0.5,6),M("#6B3E1E"),x+dx,y+0.57,z+0.18,g));mesh(new THREE.SphereGeometry(0.07,10,8),M(["#F07F1A","#D7322B","#2E9E4F"][i]),x-0.1,y+0.39,z,g);mesh(new THREE.SphereGeometry(0.07,10,8),M("#F2B705"),x+0.1,y+0.39,z,g);});},
+  library(g,y,I){brick(g,1.5,0.15,1.0,"#E8E2D4",0,y,0);brick(g,1.3,0.75,0.75,"#F3EEE2",0,y+0.15,-0.05,false);for(let i=-2;i<=2;i++)mesh(new THREE.CylinderGeometry(0.06,0.06,0.75,10),M("#FFFFFF"),i*0.3,y+0.52,0.38,g);roofPrism(g,1.5,1.0,0.4,I.color,0,y+0.9,0);const bc=["#D7322B","#1F6FD1","#F2B705","#2E9E4F","#F07F1A"];for(let i=0;i<5;i++){const b=mesh(new THREE.BoxGeometry(0.42,0.08,0.3),M(bc[i]),0.85,y+0.04+i*0.085,0.55,g);b.rotation.y=i*0.25;}},
+  wheel(g,y,I){const piv=new THREE.Group();piv.position.set(0,y+1.25,0);g.add(piv);mesh(new THREE.TorusGeometry(0.95,0.04,8,40),M(I.color),0,0,0,piv);const cabC=["#D7322B","#1F6FD1","#F2B705","#2E9E4F","#E25C9A","#12A0A8","#7D4CB7","#F3F3F3"];const cabs=[];for(let i=0;i<8;i++){const a=i/8*Math.PI*2;const s=mesh(new THREE.CylinderGeometry(0.02,0.02,0.95,6),M("#F3F3F3"),Math.cos(a)*0.47,Math.sin(a)*0.47,0,piv);s.rotation.z=a-Math.PI/2;const c=mesh(new THREE.BoxGeometry(0.2,0.2,0.2),M(cabC[i]),Math.cos(a)*0.95,Math.sin(a)*0.95,0,piv);cabs.push(c);}[-0.35,0.35].forEach(dx=>{const l=mesh(new THREE.CylinderGeometry(0.04,0.05,1.35,8),M("#1B2A38"),dx,y+0.62,0,g);l.rotation.z=dx>0?0.28:-0.28;});brick(g,0.9,0.12,0.4,"#1B2A38",0,y,0);animated.push((t,run)=>{if(run){piv.rotation.z=t*0.35;cabs.forEach(c=>c.rotation.z=-piv.rotation.z);}});},
+  village(g,y,I){house(g,-0.15,0.05,"#E9F7F6",I.color,y);const bell=mesh(new THREE.SphereGeometry(0.08,12,10),M("#FFF",{emissive:"#FFD23F",emissiveIntensity:0}),0.12,y+0.48,0.43,g);animated.push(t=>{const on=Math.floor(t*2.2)%3===0;bell.material.emissiveIntensity=on?1.6:0;});brick(g,0.5,0.25,0.25,"#F3F3F3",0.55,y,-0.45);},
+  observatory(g,y,I){brick(g,1.0,0.6,1.0,"#F3F3F3",0,y,0,false);mesh(new THREE.SphereGeometry(0.55,24,12,0,Math.PI*2,0,Math.PI/2),M(I.color),0,y+0.6,0,g);const sc=mesh(new THREE.CylinderGeometry(0.08,0.1,0.8,12),M("#1B2A38"),0.2,y+1.05,0,g);sc.rotation.z=-0.8;animated.push(t=>{sc.parent.rotation.y=Math.sin(t*0.2)*0.6;});},
+  heart(g,y,I){brick(g,1.2,0.25,1.2,"#F3F3F3",0,y,0);brick(g,0.8,0.25,0.8,"#F2B705",0,y+0.25,0);const s=new THREE.Shape();s.moveTo(0,-0.5);s.bezierCurveTo(-0.15,-0.35,-0.6,-0.1,-0.6,0.22);s.bezierCurveTo(-0.6,0.52,-0.2,0.6,0,0.32);s.bezierCurveTo(0.2,0.6,0.6,0.52,0.6,0.22);s.bezierCurveTo(0.6,-0.1,0.15,-0.35,0,-0.5);const geo=new THREE.ExtrudeGeometry(s,{depth:0.22,bevelEnabled:true,bevelSize:0.05,bevelThickness:0.05,bevelSegments:3});geo.center();const h=mesh(geo,M(I.color,{emissive:I.color,emissiveIntensity:0.15}),0,y+1.25,0,g);animated.push(t=>{h.rotation.y=t*0.6;h.position.y=y+1.25+Math.sin(t*1.6)*0.06;const lit=ringDone()>=ringTotal;h.material.emissiveIntensity=lit?0.5+Math.sin(t*3)*0.2:0.12;});}
+};
+const landmarkGroups=[];
+centers.forEach((c,i)=>{
+  const t=tiles.get(K(c.q,c.r)),g=new THREE.Group();g.position.set(t.wx,0,t.wz);
+  LM[ISLANDS[i].lm](g,t.top+0.08,ISLANDS[i]);
+  g.traverse(o=>o.userData.island=i);
+  scene.add(g);landmarkGroups.push(g);
+  // trees on a few outer tiles (offset to tile corner so paths stay clear)
+  ring(c,2).forEach((h,j)=>{if(j%3===1){const tt=tiles.get(K(h.q,h.r));const a=Math.atan2(tt.wx-t.wx,tt.wz-t.wz);tree(scene,tt.wx+Math.sin(a)*0.55,tt.wz+Math.cos(a)*0.55,tt.top+0.08,0.8+rnd()*0.4);}});
+});
+/* ===== 依各節內容加入的主題建築與道具 ===== */
+const signs=[];
+function drawSign(s){
+  const x=s.c.getContext("2d"),W=s.c.width,H=s.c.height;
+  x.fillStyle=s.bg;x.fillRect(0,0,W,H);x.strokeStyle=s.fg;x.lineWidth=10;x.strokeRect(5,5,W-10,H-10);
+  if(s.paint){s.paint(x,W,H);s.t.needsUpdate=true;return;}
+  x.fillStyle=s.fg;x.textAlign="center";x.textBaseline="middle";
+  const n=s.lines.length,longest=Math.max(...s.lines.map(l=>l.length));
+  const fs=Math.min(H*0.78/n/1.12,W*0.84/longest);
+  x.font=`700 ${fs}px "Noto Sans TC","Microsoft JhengHei",sans-serif`;
+  s.lines.forEach((l,i)=>x.fillText(l,W/2,H/2+(i-(n-1)/2)*fs*1.15));
+  s.t.needsUpdate=true;
+}
+function signMat(lines,bg,fg,W,H,paint){const c=document.createElement("canvas");c.width=W;c.height=H;const t=new THREE.CanvasTexture(c);t.encoding=THREE.sRGBEncoding;t.anisotropy=4;const s={c,t,lines,bg,fg,paint};drawSign(s);signs.push(s);return new THREE.MeshStandardMaterial({map:t,roughness:0.6});}
+if(document.fonts&&document.fonts.ready) document.fonts.ready.then(()=>signs.forEach(drawSign));
+// a signboard facing +z (toward the default camera)
+function sign(g,lines,x,y,z,o={}){
+  const w=o.w||0.6,h=o.h||w/2,post=o.post??0.25,sg=new THREE.Group();sg.position.set(x,y,z);sg.rotation.y=o.ry||0;g.add(sg);
+  if(post>0)[-w*0.35,w*0.35].forEach(px=>mesh(new THREE.CylinderGeometry(0.022,0.022,post+h/2,6),M("#6B3E1E"),px,(post+h/2)/2,-0.03,sg));
+  const side=M(o.edge||"#1B2A38"),face=signMat(lines,o.bg||"#FFFFFF",o.fg||"#1B2A38",256,Math.max(48,Math.round(256*h/w)),o.paint);
+  if(o.glow){face.emissive=new THREE.Color("#FFFFFF");face.emissiveMap=face.map;face.emissiveIntensity=0.55;}
+  mesh(new THREE.BoxGeometry(w,h,0.05),[side,side,side,side,face,side],0,post+h/2,0,sg);
+  return sg;
+}
+function lamp(g,x,z,y){mesh(new THREE.CylinderGeometry(0.022,0.03,0.7,6),M("#1B2A38"),x,y+0.35,z,g);const b=mesh(new THREE.SphereGeometry(0.07,10,8),new THREE.MeshStandardMaterial({color:"#FFF3C4",emissive:"#FFD66B",emissiveIntensity:0.2}),x,y+0.74,z,g);animated.push(()=>{b.material.emissiveIntensity=scene.userData.night?1.8:0.2;});}
+function flowers(g,x,z,y){mesh(new THREE.CylinderGeometry(0.2,0.22,0.06,10),M("#3FA34D"),x,y+0.03,z,g);const cs=["#E25C9A","#F2B705","#FFFFFF","#D7322B","#7D4CB7"];for(let k=0;k<5;k++){const a=k*1.26,r=0.07+rnd()*0.1;mesh(new THREE.SphereGeometry(0.045,8,6),M(cs[Math.floor(rnd()*5)]),x+Math.cos(a)*r,y+0.1,z+Math.sin(a)*r,g);}}
+function bench(g,x,z,y,ry=0){const b=new THREE.Group();b.position.set(x,y,z);b.rotation.y=ry;g.add(b);brick(b,0.5,0.06,0.18,"#B07A45",0,0.15,0,false);brick(b,0.5,0.16,0.04,"#B07A45",0,0.21,-0.08,false);[-0.2,0.2].forEach(px=>mesh(new THREE.BoxGeometry(0.04,0.15,0.16),M("#1B2A38"),px,0.075,0,b));}
+function crate(g,x,z,y,c="#C8955C"){brick(g,0.22,0.2,0.22,c,x,y,z);}
+function table(g,x,z,y,c="#B07A45",w=0.5){brick(g,w,0.05,0.36,c,x,y+0.26,z,false);[[-1,-1],[1,-1],[-1,1],[1,1]].forEach(([a,b])=>mesh(new THREE.BoxGeometry(0.04,0.26,0.04),M("#6B3E1E"),x+a*(w/2-0.05),y+0.13,z+b*0.13,g));}
+function windows(g,w,h,cols,rows,x,y,z,c="#BFE6FF"){for(let i=0;i<cols;i++)for(let j=0;j<rows;j++){const m=mesh(new THREE.BoxGeometry(w*0.55/cols,h*0.5/rows,0.02),new THREE.MeshStandardMaterial({color:c,emissive:"#FFD66B",emissiveIntensity:0}),x-w/2+(i+0.5)*w/cols,y+(j+0.5)*h/rows,z,g);animated.push(()=>{m.material.emissiveIntensity=scene.userData.night?0.9:0;});}}
+function flag(g,x,z,y,c,hgt=1){mesh(new THREE.CylinderGeometry(0.02,0.02,hgt,6),M("#8C8C8C"),x,y+hgt/2,z,g);const f=mesh(new THREE.BoxGeometry(0.3,0.18,0.015),M(c),x+0.15,y+hgt-0.1,z,g);const ph=rnd()*6;animated.push(t=>{f.rotation.y=Math.sin(t*3+ph)*0.3;});}
+function stripeTex(colors){const c=document.createElement("canvas");c.width=c.height=64;const x=c.getContext("2d");for(let i=-4;i<8;i++){x.fillStyle=colors[((i%colors.length)+colors.length)%colors.length];x.beginPath();x.moveTo(i*16,0);x.lineTo(i*16+16,0);x.lineTo(i*16-48,64);x.lineTo(i*16-64,64);x.fill();}const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.encoding=THREE.sRGBEncoding;return t;}
+
+const PROPS=[
+ [ // 一 政策港：課綱進校園、法規公告、碼頭
+  (g,y)=>{brick(g,1.0,0.5,0.6,"#F3E3C3",0,y,-0.08,false);windows(g,1.0,0.5,3,1,0,y+0.08,0.23);brick(g,1.1,0.08,0.7,"#D7322B",0,y+0.5,-0.08);brick(g,0.28,0.3,0.28,"#F3E3C3",0,y+0.58,-0.08,false);const ck=mesh(new THREE.CylinderGeometry(0.09,0.09,0.02,16),M("#FFFFFF"),0,y+0.74,0.07,g);ck.rotation.x=Math.PI/2;sign(g,["111學年","手語上課"],0,y,0.42,{w:0.5,post:0.1});},
+  (g,y)=>{sign(g,["國家語言","發展法"],0,y,-0.05,{w:0.8,post:0.32,bg:"#FFF6D6"});flowers(g,-0.42,0.3,y);flowers(g,0.42,0.3,y);},
+  (g,y,c)=>{const p=new THREE.Group();p.rotation.y=c.out;g.add(p);for(let k=0;k<5;k++)brick(p,0.5,0.06,0.22,"#C8955C",0,0.3,0.8+k*0.24,false);[1.0,1.75].forEach(zz=>[-0.22,0.22].forEach(xx=>mesh(new THREE.CylinderGeometry(0.03,0.03,0.4,6),M("#6B3E1E"),xx,0.17,zz,p)));brick(p,0.28,0.12,0.6,"#1F6FD1",0.5,0.02,1.45);crate(g,-0.2,0.1,y);crate(g,0.05,-0.15,y,"#9A6B3F");lamp(g,0.35,0.15,y);},
+  (g,y)=>{["#D7322B","#1F6FD1","#F2B705"].forEach((c,i)=>flag(g,-0.35+i*0.35,0,y,c,0.9+i*0.1));},
+  (g,y)=>{crate(g,0,0,y);crate(g,0.24,0,y,"#9A6B3F");crate(g,0.12,0,y+0.2);bench(g,-0.3,0.25,y);}
+ ],
+ [ // 二 功能燈塔：用眼睛接收、書在桌子上、三策略路標、光線與距離
+  (g,y)=>{brick(g,0.4,0.3,0.4,"#9AA6B2",0,y,0);const e=new THREE.Group();e.position.set(0,y+0.62,0);g.add(e);mesh(new THREE.SphereGeometry(0.26,20,14),M("#FFFFFF"),0,0,0,e);const ir=mesh(new THREE.CylinderGeometry(0.12,0.12,0.03,20),M("#1F6FD1"),0,0,0.245,e);ir.rotation.x=Math.PI/2;const pu=mesh(new THREE.CylinderGeometry(0.055,0.055,0.035,16),M("#1B1B1B"),0,0,0.26,e);pu.rotation.x=Math.PI/2;animated.push(t=>{e.rotation.y=Math.sin(t*0.8)*0.6;});sign(g,["手語","用眼睛看"],0.42,y,0.3,{w:0.4,post:0.08});},
+  (g,y)=>{table(g,0,0,y);brick(g,0.2,0.06,0.15,"#D7322B",0.02,y+0.31,0,false);sign(g,["書在","桌子上"],0,y,0.42,{w:0.45,post:0.06,bg:"#FFF6D6"});},
+  (g,y)=>{mesh(new THREE.CylinderGeometry(0.035,0.035,1.1,8),M("#6B3E1E"),0,y+0.55,0,g);[["主題掌握","#1F6FD1",-0.5],["脈絡化教學","#2E9E4F",0.6],["情境引導","#F07F1A",2.2]].forEach(([l,c,ry],i)=>{const a=new THREE.Group();a.position.set(0,y+0.95-i*0.2,0);a.rotation.y=ry;g.add(a);sign(a,[l],0.3,0,0,{w:0.56,h:0.15,post:0,bg:c,fg:"#FFFFFF",edge:c});});},
+  (g,y)=>{lamp(g,-0.32,-0.1,y);lamp(g,0.32,-0.1,y);sign(g,["光線","與距離"],0,y,0.3,{w:0.45,post:0.12});},
+  (g,y)=>{bench(g,0,0,y);flowers(g,0.4,0.3,y);flowers(g,-0.4,-0.25,y);}
+ ],
+ [ // 三 家人村：我的家人、工作 辛苦、讀書 努力、雞蛋與瓦片
+  (g,y)=>{brick(g,0.75,0.4,0.6,"#FFE0B5",0,y,-0.05,false);brick(g,0.75,0.35,0.6,"#FFF1C9",0,y+0.4,-0.05,false);windows(g,0.75,0.75,2,2,0,y+0.02,0.26);roofPrism(g,0.9,0.75,0.4,"#D7322B",0,y+0.75,-0.05);sign(g,["爸爸 媽媽","哥哥 姊姊"],0,y,0.45,{w:0.55,post:0.06});},
+  (g,y)=>{brick(g,0.55,1.25,0.5,"#9AA6B2",0,y,-0.05,false);windows(g,0.55,1.15,2,4,0,y+0.05,0.21);brick(g,0.6,0.06,0.55,"#1B2A38",0,y+1.25,-0.05);sign(g,["工作","辛苦"],0,y,0.42,{w:0.45,post:0.06,bg:"#FFF6D6"});},
+  (g,y)=>{brick(g,0.9,0.45,0.55,"#F7D7D7",0,y,-0.08,false);windows(g,0.9,0.45,3,1,0,y+0.05,0.2);brick(g,0.95,0.07,0.6,"#1F6FD1",0,y+0.45,-0.08);brick(g,0.22,0.3,0.22,"#F7D7D7",0,y+0.52,-0.08,false);roofPrism(g,0.3,0.3,0.2,"#1F6FD1",0,y+0.82,-0.08);sign(g,["讀書","努力"],0,y,0.42,{w:0.45,post:0.06,bg:"#FFF6D6"});},
+  (g,y)=>{house(g,-0.1,-0.15,"#FFF6E5","#B5532F",y);mesh(new THREE.CylinderGeometry(0.13,0.1,0.12,12),M("#B07A45"),0.38,y+0.06,0.32,g);[[-0.04,0],[0.05,0.03],[0,-0.05]].forEach(([a,b])=>{const e=mesh(new THREE.SphereGeometry(0.05,10,8),M("#FFF9EE"),0.38+a,y+0.15,0.32+b,g);e.scale.y=1.3;});[[0.1,0.42,0.6],[0.2,0.48,-0.4]].forEach(([a,b,r])=>{const s=mesh(new THREE.BoxGeometry(0.1,0.02,0.07),M("#B5532F"),a,y+0.01,b,g);s.rotation.y=r;});sign(g,["雞蛋","與瓦片"],-0.38,y,0.42,{w:0.36,post:0.06});},
+  (g,y)=>{tree(g,0,-0.05,y,1.5);["#D7322B","#F2B705","#1F6FD1","#E25C9A"].forEach((c,i)=>{const a=i*1.57+0.4;mesh(new THREE.SphereGeometry(0.06,10,8),M(c),Math.cos(a)*0.3,y+0.75,-0.05+Math.sin(a)*0.3,g);});sign(g,["我 愛 你們"],0,y,0.45,{w:0.5,h:0.16,post:0.06,bg:"#FFE3EE"});}
+ ],
+ [ // 四 句型市場：魚 買 不、服藥 按時 不、剪頭髮 要、戴口罩 要
+  (g,y)=>{brick(g,0.65,0.3,0.4,"#1F6FD1",0,y,0);brick(g,0.6,0.03,0.36,"#E8F6FF",0,y+0.3,0,false);for(let i=0;i<3;i++){const f=mesh(new THREE.SphereGeometry(0.1,12,8),M("#8FB3C9"),-0.18+i*0.18,y+0.37,0,g);f.scale.set(1,0.4,0.45);const tl=mesh(new THREE.ConeGeometry(0.05,0.08,4),M("#8FB3C9"),-0.18+i*0.18-0.12,y+0.37,0,g);tl.rotation.z=Math.PI/2;}sign(g,["魚","買 不"],0,y,0.38,{w:0.4,post:0.04});},
+  (g,y)=>{brick(g,0.65,0.3,0.4,"#B07A45",0,y,0);for(let i=0;i<3;i++)mesh(new THREE.SphereGeometry(0.08,10,8),M("#5DBB46"),-0.2+i*0.12,y+0.37,-0.05,g);for(let i=0;i<3;i++){const cr=mesh(new THREE.ConeGeometry(0.035,0.18,8),M("#F07F1A"),0.12+i*0.06,y+0.34,0.05,g);cr.rotation.x=Math.PI/2;}for(let k=0;k<4;k++)mesh(new THREE.BoxGeometry(0.17,0.035,0.5),M(k%2?"#F3F3F3":"#2E9E4F"),-0.25+k*0.17,y+0.85,0,g);[-0.3,0.3].forEach(dx=>mesh(new THREE.CylinderGeometry(0.02,0.02,0.55,6),M("#6B3E1E"),dx,y+0.57,0.18,g));sign(g,["菜市場"],0,y,0.4,{w:0.4,h:0.14,post:0.04});},
+  (g,y)=>{brick(g,0.7,0.55,0.5,"#FFFFFF",0,y,-0.05,false);mesh(new THREE.BoxGeometry(0.22,0.07,0.02),M("#2E9E4F",{emissive:"#2E9E4F",emissiveIntensity:0.3}),0,y+0.4,0.21,g);mesh(new THREE.BoxGeometry(0.07,0.22,0.02),M("#2E9E4F",{emissive:"#2E9E4F",emissiveIntensity:0.3}),0,y+0.4,0.21,g);brick(g,0.75,0.07,0.55,"#2E9E4F",0,y+0.55,-0.05);sign(g,["服藥","按時 不"],0,y,0.42,{w:0.45,post:0.04});},
+  (g,y)=>{brick(g,0.6,0.5,0.5,"#F3E3C3",-0.08,y,-0.05,false);roofPrism(g,0.7,0.6,0.3,"#1F6FD1",-0.08,y+0.5,-0.05);const pole=mesh(new THREE.CylinderGeometry(0.05,0.05,0.4,16),new THREE.MeshStandardMaterial({map:stripeTex(["#D7322B","#FFFFFF","#1F6FD1","#FFFFFF"])}),0.32,y+0.35,0.25,g);animated.push((t,run)=>{if(run)pole.material.map.offset.y=-t*0.4;});sign(g,["剪頭髮","要"],-0.1,y,0.42,{w:0.42,post:0.04});},
+  (g,y)=>{table(g,0,0,y);for(let i=0;i<4;i++)brick(g,0.08,0.02,0.05,"#9ED0F0",-0.15+i*0.1,y+0.31,0,false);sign(g,["戴口罩","要"],0,y,0.38,{w:0.42,post:0.06,bg:"#E8F6FF"});crate(g,0.38,-0.2,y);}
+ ],
+ [ // 五 課文圖書館：課文、看圖說故事、屋頂事件、語句拆合
+  (g,y)=>{brick(g,0.45,0.25,0.3,"#9AA6B2",0,y,0);[-1,1].forEach(s=>{const pg=mesh(new THREE.BoxGeometry(0.42,0.03,0.55),M("#FFFFFF"),s*0.2,y+0.38,0,g);pg.rotation.z=s*0.3;const cv=mesh(new THREE.BoxGeometry(0.44,0.02,0.57),M("#7D4CB7"),s*0.2,y+0.36,0,g);cv.rotation.z=s*0.3;});sign(g,["課文","在情境裡"],0,y,0.42,{w:0.42,post:0.04});},
+  (g,y)=>{[-0.18,0.18].forEach(dx=>{const l=mesh(new THREE.BoxGeometry(0.04,0.8,0.04),M("#6B3E1E"),dx,y+0.38,0,g);l.rotation.z=dx>0?-0.12:0.12;});sign(g,[],0,y+0.3,0.03,{w:0.6,h:0.42,post:0,bg:"#FFFDF6",paint:(x,W,H)=>{const cs=["#D7322B","#1F6FD1","#F2B705","#2E9E4F"];cs.forEach((c,i)=>{x.fillStyle=c;x.fillRect(22+(i%2)*112,18+Math.floor(i/2)*(H/2-8),100,H/2-30);});x.fillStyle="#1B2A38";x.font=`700 ${H*0.16}px "Noto Sans TC",sans-serif`;x.textAlign="center";x.fillText("看圖說故事",W/2,H-14);}});},
+  (g,y)=>{house(g,0,-0.05,"#F3EEE2","#B5532F",y);const ld=new THREE.Group();ld.position.set(0.42,y,0.05);ld.rotation.z=0.35;g.add(ld);[-0.06,0.06].forEach(dz=>mesh(new THREE.BoxGeometry(0.03,0.8,0.03),M("#C8955C"),0,0.4,dz,ld));for(let k=0;k<4;k++)mesh(new THREE.BoxGeometry(0.03,0.03,0.14),M("#C8955C"),0,0.12+k*0.18,0,ld);sign(g,["屋頂","事件"],-0.35,y,0.42,{w:0.36,post:0.04});},
+  (g,y)=>{brick(g,0.4,0.15,0.25,"#D7322B",-0.15,y,0);brick(g,0.4,0.15,0.25,"#1F6FD1",-0.15,y+0.15,0);brick(g,0.4,0.15,0.25,"#F2B705",-0.15,y+0.3,0);brick(g,0.3,0.15,0.25,"#2E9E4F",0.32,y,0.05);const fl=new THREE.Group();g.add(fl);brick(fl,0.3,0.15,0.25,"#E25C9A",0.32,y+0.3,0.05);animated.push((t,run)=>{if(run)fl.position.y=0.08+Math.sin(t*1.5)*0.08;});sign(g,["語句","拆合"],0,y,0.4,{w:0.42,post:0.04});},
+  (g,y)=>{bench(g,0,0.05,y);["#D7322B","#1F6FD1","#F2B705","#2E9E4F"].forEach((c,i)=>brick(g,0.2,0.05,0.14,c,0.38,y+i*0.05,-0.25,false));lamp(g,-0.35,-0.2,y);}
+ ],
+ [ // 六 活動遊樂園：旋轉木馬、連連看、角色扮演、氣球、溜滑梯
+  (g,y)=>{brick(g,0.8,0.1,0.8,"#F3F3F3",0,y,0,false);const top=new THREE.Group();top.position.y=y+0.1;g.add(top);mesh(new THREE.CylinderGeometry(0.06,0.06,0.75,8),M("#F2B705"),0,0.38,0,top);const cn=mesh(new THREE.ConeGeometry(0.48,0.3,12),new THREE.MeshStandardMaterial({map:stripeTex(["#D7322B","#FFFFFF"])}),0,0.9,0,top);const horses=["#FFFFFF","#F2B705","#1F6FD1","#E25C9A"];horses.forEach((c,i)=>{const a=i*Math.PI/2;mesh(new THREE.CylinderGeometry(0.015,0.015,0.7,6),M("#C9C9C9"),Math.cos(a)*0.3,0.4,Math.sin(a)*0.3,top);const h=mesh(new THREE.BoxGeometry(0.18,0.1,0.07),M(c),Math.cos(a)*0.3,0.3,Math.sin(a)*0.3,top);h.rotation.y=-a;});animated.push((t,run)=>{if(run)top.rotation.y=t*0.8;});},
+  (g,y)=>{sign(g,[],0,y,0,{w:0.75,h:0.48,post:0.2,bg:"#FFFFFF",paint:(x,W,H)=>{const cs=["#D7322B","#1F6FD1","#2E9E4F"],L=[0,1,2],Rr=[2,0,1];x.lineWidth=7;L.forEach(i=>{const y1=H*(0.25+i*0.25),y2=H*(0.25+Rr[i]*0.25);x.strokeStyle=cs[i];x.beginPath();x.moveTo(60,y1);x.lineTo(W-60,y2);x.stroke();x.fillStyle=cs[i];x.fillRect(22,y1-16,32,32);x.beginPath();x.arc(W-38,y2,16,0,7);x.fill();});}});},
+  (g,y)=>{brick(g,0.85,0.14,0.6,"#B07A45",0,y,0);brick(g,0.85,0.6,0.06,"#1B2A38",0,y+0.14,-0.27,false);[-0.36,0.36].forEach(dx=>brick(g,0.14,0.6,0.08,"#D7322B",dx,y+0.14,-0.2,false));brick(g,0.85,0.12,0.1,"#D7322B",0,y+0.74,-0.22,false);sign(g,["角色扮演"],0,y+0.86,-0.22,{w:0.5,h:0.14,post:0,bg:"#F2B705"});},
+  (g,y)=>{brick(g,0.35,0.2,0.25,"#F07F1A",0,y,0);["#D7322B","#1F6FD1","#F2B705","#2E9E4F","#E25C9A"].forEach((c,i)=>{const a=i*1.25,bx=Math.cos(a)*0.18,bz=Math.sin(a)*0.15,b=mesh(new THREE.SphereGeometry(0.1,14,10),M(c),bx,y+0.95,bz,g);b.scale.y=1.2;mesh(new THREE.CylinderGeometry(0.004,0.004,0.6,4),M("#FFFFFF"),bx*0.5,y+0.55,bz*0.5,g);animated.push(t=>{b.position.y=y+0.95+Math.sin(t*2+i)*0.04;});});},
+  (g,y)=>{brick(g,0.25,0.55,0.25,"#1F6FD1",-0.25,y,0);const sl=mesh(new THREE.BoxGeometry(0.22,0.04,0.75),M("#F2B705"),0.0,y+0.3,0.0,g);sl.rotation.set(0,Math.PI/2,0);sl.rotation.order="YXZ";sl.rotation.x=0.65;sl.position.set(0.05,y+0.3,0);flowers(g,0.4,0.3,y);}
+ ],
+ [ // 七 聾人文化村：閃光門鈴、震動鬧鐘、視訊手語、避免背光、眼神接觸
+  (g,y)=>{house(g,0,-0.05,"#E9F7F6","#12A0A8",y);const bl=mesh(new THREE.SphereGeometry(0.07,12,10),M("#FFFFFF",{emissive:"#FFD23F",emissiveIntensity:0}),0.24,y+0.45,0.33,g);animated.push(t=>{bl.material.emissiveIntensity=Math.floor(t*2.2+1)%3===0?1.6:0;});sign(g,["閃光","門鈴"],-0.32,y,0.45,{w:0.34,post:0.05});},
+  (g,y)=>{const ck=new THREE.Group();ck.position.set(0,y+0.42,0);g.add(ck);const body=mesh(new THREE.CylinderGeometry(0.3,0.3,0.16,24),M("#D7322B"),0,0,0,ck);body.rotation.x=Math.PI/2;const fc=mesh(new THREE.CylinderGeometry(0.25,0.25,0.02,24),M("#FFFFFF"),0,0,0.085,ck);fc.rotation.x=Math.PI/2;mesh(new THREE.BoxGeometry(0.02,0.16,0.01),M("#1B1B1B"),0,0.06,0.1,ck);const mh=mesh(new THREE.BoxGeometry(0.12,0.02,0.01),M("#1B1B1B"),0.05,0,0.1,ck);[-0.18,0.18].forEach(dx=>{mesh(new THREE.SphereGeometry(0.09,12,8,0,Math.PI*2,0,Math.PI/2),M("#F2B705"),dx,0.25,0,ck);mesh(new THREE.BoxGeometry(0.04,0.14,0.04),M("#1B2A38"),dx*0.9,-0.32,0,ck);});animated.push(t=>{const ring=Math.floor(t/2.5)%2===0;ck.rotation.z=ring?Math.sin(t*40)*0.06:0;ck.position.x=ring?Math.sin(t*33)*0.015:0;});sign(g,["震動","鬧鐘"],0.42,y,0.35,{w:0.34,post:0.05});},
+  (g,y)=>{mesh(new THREE.BoxGeometry(0.08,0.55,0.08),M("#1B2A38"),0,y+0.27,-0.05,g);sign(g,[],0,y+0.5,0,{w:0.7,h:0.45,post:0,bg:"#1F6FD1",edge:"#1B2A38",glow:true,paint:(x,W,H)=>{x.fillStyle="#BFE6FF";x.fillRect(16,16,W-32,H-60);x.fillStyle="#F6C744";x.beginPath();x.arc(W/2,H*0.36,H*0.13,0,7);x.fill();x.fillStyle="#D7322B";x.fillRect(W/2-H*0.18,H*0.5,H*0.36,H*0.2);x.fillStyle="#F6C744";x.beginPath();x.arc(W/2+H*0.3,H*0.42,H*0.06,0,7);x.fill();x.fillStyle="#FFFFFF";x.font=`700 ${H*0.15}px "Noto Sans TC",sans-serif`;x.textAlign="center";x.fillText("視訊手語",W/2,H-16);}});},
+  (g,y)=>{lamp(g,-0.3,-0.15,y);lamp(g,0.3,-0.15,y);sign(g,["避免","背光"],0,y,0.25,{w:0.42,post:0.12});},
+  (g,y)=>{table(g,0,0,y,"#FFFFFF",0.36);[-1,1].forEach(s=>{brick(g,0.16,0.04,0.16,"#12A0A8",s*0.32,y+0.16,0,false);brick(g,0.04,0.2,0.16,"#12A0A8",s*0.4,y+0.2,0,false);});sign(g,["眼神","接觸"],0,y,0.4,{w:0.38,post:0.05});}
+ ],
+ [ // 八 評量觀測站：五個評量面向、自我檢核、教師反思
+  (g,y)=>{const L=["理解","形式","表達","互動","文化"],H=[0.45,0.7,0.58,0.8,0.62],C=["#1F6FD1","#D7322B","#F2B705","#2E9E4F","#12A0A8"];L.forEach((l,i)=>{const x=-0.4+i*0.2;brick(g,0.16,H[i],0.16,C[i],x,y,-0.05);sign(g,[l],x,y,0.08,{w:0.18,h:0.1,post:0,bg:"#FFFFFF"});});},
+  (g,y)=>{sign(g,["✓功能 ✓情境","✓互動 ✓文化"],0,y,0,{w:0.8,h:0.42,post:0.22,bg:"#FFF6D6"});},
+  (g,y)=>{brick(g,0.5,0.7,0.06,"#B07A45",0,y+0.08,0,false);mesh(new THREE.BoxGeometry(0.42,0.6,0.02),new THREE.MeshStandardMaterial({color:"#DDEFF7",metalness:0.9,roughness:0.08}),0,y+0.43,0.035,g);[-0.18,0.18].forEach(dx=>mesh(new THREE.BoxGeometry(0.05,0.08,0.25),M("#6B3E1E"),dx,y+0.04,0,g));sign(g,["教師","反思"],0.42,y,0.3,{w:0.32,post:0.05});},
+  (g,y)=>{mesh(new THREE.CylinderGeometry(0.04,0.06,0.5,8),M("#9AA6B2"),0,y+0.25,0,g);const d=mesh(new THREE.SphereGeometry(0.3,20,10,0,Math.PI*2,0,Math.PI/2.6),M("#FFFFFF",{side:THREE.DoubleSide}),0,y+0.55,0,g);d.rotation.x=-0.9;animated.push(t=>{d.rotation.z=Math.sin(t*0.5)*0.8;});},
+  (g,y)=>{bench(g,0,0,y);lamp(g,0.38,-0.2,y);flowers(g,-0.38,0.3,y);}
+ ],
+ [ // 九 心島：彩虹拱門、噴泉與核心關鍵字
+  (g,y)=>{const C=["#D7322B","#F07F1A","#F2B705","#2E9E4F","#1F6FD1","#7D4CB7"];[-0.36,0.36].forEach(dx=>{for(let k=0;k<4;k++)brick(g,0.16,0.18,0.16,C[k],dx,y+k*0.18,0,false);});brick(g,0.88,0.16,0.16,C[4],0,y+0.72,0);brick(g,0.6,0.12,0.16,C[5],0,y+0.88,0);},
+  (g,y)=>{mesh(new THREE.CylinderGeometry(0.42,0.45,0.18,20),M("#F3F3F3"),0,y+0.09,0,g);const w=mesh(new THREE.CylinderGeometry(0.36,0.36,0.02,20),M("#4FB3C8",{roughness:0.2}),0,y+0.17,0,g);mesh(new THREE.CylinderGeometry(0.05,0.07,0.35,10),M("#F3F3F3"),0,y+0.3,0,g);const sp=mesh(new THREE.SphereGeometry(0.08,12,10),M("#BFE6FF",{transparent:true,opacity:0.8}),0,y+0.5,0,g);animated.push((t,run)=>{if(run){const k=(t*1.5)%1;sp.position.y=y+0.48+k*0.15;sp.scale.setScalar(1+k*0.6);sp.material.opacity=0.8*(1-k);}});},
+  (g,y)=>{sign(g,["語言功能"],0,y,0,{w:0.7,h:0.22,post:0.3,bg:"#FFE3E3"});flowers(g,-0.4,0.3,y);},
+  (g,y)=>{sign(g,["情境脈絡"],0,y,0,{w:0.7,h:0.22,post:0.3,bg:"#E3F0FF"});flowers(g,0.4,0.3,y);},
+  (g,y)=>{sign(g,["聾人文化"],0,y,0,{w:0.7,h:0.22,post:0.3,bg:"#E3F7EE"});bench(g,0,0.35,y);}
+ ]
+];
+const PROP_NAMES=[
+  ["學校","法規公告牌","碼頭","旗幟廣場","貨物區"],
+  ["眼睛雕塑","書桌","三策略路標","路燈","休憩區"],
+  ["我家","辦公大樓","學校","瓦片屋","家庭樹"],
+  ["魚攤","菜攤","藥局","理髮店","口罩攤"],
+  ["大書雕塑","看圖說故事畫架","屋頂小屋","語句拆合積木","閱讀角"],
+  ["旋轉木馬","連連看看板","角色扮演舞台","氣球攤","溜滑梯"],
+  ["閃光門鈴屋","震動鬧鐘","視訊手語亭","路燈","眼神咖啡座"],
+  ["五面向長條柱","自我檢核看板","反思鏡","雷達","觀星長椅"],
+  ["彩虹拱門","噴泉","語言功能牌","情境脈絡牌","聾人文化牌"]
+];
+const islandProps=centers.map(()=>[]);
+// an empty lot with scaffolding, shown until the island's residents are answered
+function siteMesh(t,i){
+  const g=new THREE.Group();g.position.set(t.wx,0,t.wz);const y=t.top+0.08;
+  brick(g,0.78,0.05,0.78,"#E6D8CA",0,y,0,false);
+  [[-0.3,-0.3],[0.3,-0.3],[-0.3,0.3],[0.3,0.3]].forEach(([a,b])=>mesh(new THREE.CylinderGeometry(0.018,0.018,0.62,6),M("#C2AE98"),a,y+0.36,b,g));
+  [-0.3,0.3].forEach(b=>brick(g,0.64,0.03,0.03,"#C2AE98",0,y+0.64,b,false));
+  brick(g,0.24,0.12,0.18,"#F1E6DA",-0.12,y+0.05,-0.08);brick(g,0.24,0.12,0.18,"#F1E6DA",-0.12,y+0.17,-0.08);
+  mesh(new THREE.ConeGeometry(0.07,0.18,10),M("#F07F1A"),0.26,y+0.14,0.3,g);
+  sign(g,["待建造"],0.02,y,0.36,{w:0.36,h:0.13,post:0.04,bg:"#FCDD6B"});
+  g.traverse(o=>o.userData.island=i);scene.add(g);return g;
+}
+centers.forEach((c,i)=>{
+  const ct=tiles.get(K(c.q,c.r));
+  const nearBridge=t=>nbrs(t).some(n=>n.bridge);
+  const cand=ring(c,2).map((h,j)=>({t:tiles.get(K(h.q,h.r)),j})).filter(o=>o.j%3!==1&&!nearBridge(o.t)).map(o=>o.t);
+  // spread props around the ring instead of bunching them on one side
+  const step=cand.length/PROPS[i].length;
+  PROPS[i].forEach((fn,k)=>{
+    const t=cand[Math.floor(k*step)]; if(!t) return;
+    const g=new THREE.Group();g.position.set(t.wx,0,t.wz);scene.add(g);
+    fn(g,t.top+0.08,{out:Math.atan2(t.wx-ct.wx,t.wz-ct.wz)});
+    g.traverse(o=>o.userData.island=i);g.visible=false;
+    const s=siteMesh(t,i);
+    blocked.add(K(t.q,t.r));landmarkGroups.push(g,s);
+    islandProps[i].push({g,site:s,t,name:PROP_NAMES[i][k],built:false});
+  });
+  // small lamps and flower beds on the inner ring, tucked into tile corners
+  ring(c,1).forEach((h,j)=>{if(j%2)return;const t=tiles.get(K(h.q,h.r));const a=Math.atan2(t.wx-ct.wx,t.wz-ct.wz)+0.9;const x=t.wx+Math.sin(a)*0.62,z=t.wz+Math.cos(a)*0.62;(j%4===0?lamp:flowers)(scene,x,z,t.top+0.08);});
+});
+
+// boats & clouds
+const boats=[];
+for(let i=0;i<5;i++){const g=new THREE.Group();brick(g,0.8,0.18,0.36,["#D7322B","#F3F3F3","#1F6FD1","#F2B705","#2E9E4F"][i],0,0,0);mesh(new THREE.CylinderGeometry(0.02,0.02,0.7,6),M("#6B3E1E"),0,0.5,0,g);const sail=new THREE.Shape();sail.moveTo(0,0);sail.lineTo(0.35,0);sail.lineTo(0,0.55);mesh(new THREE.ShapeGeometry(sail),M("#FFFFFF",{side:THREE.DoubleSide}),0.02,0.22,0,g);scene.add(g);boats.push({g,r:15.5+i*0.9+(i%2)*4,a:i*1.3,s:0.04+i*0.008});}
+const clouds=[];
+for(let i=0;i<7;i++){const g=new THREE.Group();for(let k=0;k<4;k++){const m=new THREE.Mesh(new THREE.SphereGeometry(0.8+rnd()*0.6,14,10),M("#FFFFFF",{roughness:0.9}));m.position.set(k*0.9-1.3,rnd()*0.4,rnd()*0.6);g.add(m);}g.position.set(-35+rnd()*70,10+rnd()*4,-30+rnd()*50);scene.add(g);clouds.push(g);}
+
+/* ============ 人偶 ============ */
+const SKIN="#F6C744";
+function fig(shirt,pants,hair){
+  const g=new THREE.Group(),s=0.82;
+  const legL=new THREE.Group(),legR=new THREE.Group();legL.position.set(-0.07*s,0.26*s,0);legR.position.set(0.07*s,0.26*s,0);
+  [legL,legR].forEach(l=>{mesh(new THREE.BoxGeometry(0.13*s,0.26*s,0.15*s),M(pants),0,-0.13*s,0.005,l);g.add(l);});
+  mesh(new THREE.BoxGeometry(0.29*s,0.06*s,0.16*s),M(pants),0,0.29*s,0,g);
+  const torso=mesh(new THREE.CylinderGeometry(0.13*s,0.18*s,0.3*s,4),M(shirt),0,0.47*s,0,g);torso.rotation.y=Math.PI/4;torso.scale.set(1.15,1,0.62);
+  const arms=[-1,1].map(side=>{const a=new THREE.Group();a.position.set(side*0.19*s,0.59*s,0);mesh(new THREE.BoxGeometry(0.08*s,0.24*s,0.09*s),M(shirt),0,-0.11*s,0,a);mesh(new THREE.SphereGeometry(0.05*s,10,8),M(SKIN),0,-0.25*s,0.02,a);g.add(a);return a;});
+  const head=mesh(new THREE.CylinderGeometry(0.11*s,0.11*s,0.19*s,18),M(SKIN),0,0.73*s,0,g);
+  mesh(new THREE.CylinderGeometry(0.075*s,0.075*s,0.05*s,14),M(SKIN),0,0.62*s,0,g);
+  [-0.04,0.04].forEach(x=>mesh(new THREE.SphereGeometry(0.017*s,8,6),M("#1B1B1B"),x*s,0.75*s,0.105*s,g));
+  const smile=mesh(new THREE.TorusGeometry(0.035*s,0.008*s,6,12,Math.PI),M("#1B1B1B"),0,0.71*s,0.105*s,g);smile.rotation.z=Math.PI;
+  const hairM=mesh(new THREE.SphereGeometry(0.125*s,18,10,0,Math.PI*2,0,Math.PI/2),M(hair),0,0.8*s,-0.01,g);hairM.scale.set(1,0.8,1.05);
+  g.traverse(o=>{if(o.isMesh)o.castShadow=true;});
+  return {g,legL,legR,armL:arms[0],armR:arms[1],head};
+}
+function markerMesh(){const m=new THREE.Mesh(new THREE.OctahedronGeometry(0.13),M("#F2B705",{emissive:"#F2B705",emissiveIntensity:0.4}));m.castShadow=false;return m;}
+
+const islandTiles=centers.map((c,i)=>spiral(c,2).map(h=>tiles.get(K(h.q,h.r))).filter(walk));
+const actors=[];
+const perIsland={};
+RESIDENTS.forEach((r,i)=>{
+  const f=fig(...r.look);
+  const list=islandTiles[r.island];perIsland[r.island]=(perIsland[r.island]||0)+1;
+  const t=list[(perIsland[r.island]*5+3)%list.length];
+  f.g.position.set(t.wx,t.top+0.08,t.wz); f.g.rotation.y=rnd()*6.28;
+  f.g.traverse(o=>o.userData.resident=r);
+  const mk=markerMesh(); mk.userData.resident=r; f.g.add(mk); mk.position.y=1.05;
+  scene.add(f.g);
+  const tag=document.createElement("div");tag.className="tag";tag.textContent=r.name;labelsEl.appendChild(tag);
+  actors.push(Object.assign(f,{res:r,tile:t,path:[],wait:1+rnd()*4,mk,tag,phase:rnd()*6,sign:0,frozen:false}));
+  r.actor=actors[actors.length-1];
+});
+// player
+const start=tiles.get(K(centers[8].q+1,centers[8].r+1))||islandTiles[8][0];
+const P=fig("#D7322B","#1F6FD1","#F2B705");
+P.g.position.set(start.wx,start.top+0.08,start.wz);scene.add(P.g);
+const cap=mesh(new THREE.CylinderGeometry(0.115,0.12,0.06,18),M("#F2B705"),0,0.7,0,P.g);
+const ptag=document.createElement("div");ptag.className="tag me";ptag.textContent="你";labelsEl.appendChild(ptag);
+const player=Object.assign(P,{tile:start,path:[],onArrive:null});
+const ringMark=mesh(new THREE.RingGeometry(0.55,0.75,6),new THREE.MeshBasicMaterial({color:"#F2B705",transparent:true,opacity:0.9,side:THREE.DoubleSide}),0,0,0,scene);
+ringMark.rotation.x=-Math.PI/2;ringMark.rotation.z=Math.PI/6;ringMark.visible=false;ringMark.castShadow=false;
+
+/* island pins */
+const pins=ISLANDS.map((I,i)=>{
+  const b=document.createElement("button");b.className="pin";b.innerHTML=`<b style="background:${I.color};${I.center?"":""}">${I.no}</b>${I.name}<i></i>`;
+  b.onclick=()=>{openIsland(i);focusIsland(i);};labelsEl.appendChild(b);return b;
+});
+
+/* ============ 邊學邊蓋：答對就把島蓋起來 ============ */
+const pendingBuild=[],drops=[],sparks=[];
+function builtTarget(i){
+  const list=islandProps[i];if(!list.length)return 0;
+  if(i===8) return Math.floor(ringDone()/ringTotal*list.length); // 心島跟著全體進度一起長
+  const rs=RESIDENTS.filter(r=>r.island===i),d=rs.filter(isDone).length;
+  return d>=rs.length?list.length:Math.ceil(d/rs.length*list.length);
+}
+function syncBuild(animate){
+  islandProps.forEach((list,i)=>{const n=builtTarget(i);list.forEach((p,k)=>{
+    if(k<n&&!p.built){p.built=true;if(animate)pendingBuild.push(p);else{p.g.visible=true;p.site.visible=false;}}
+  });});
+}
+function playBuilds(){
+  if(!pendingBuild.length)return;
+  const ps=pendingBuild.splice(0),a=ps[0].t;
+  topView=false;setPressed("tTop",false);follow=false;setPressed("tFollow",false);
+  flyTo({x:a.wx,y:a.top,z:a.wz},11,0.9);
+  ps.forEach((p,n)=>setTimeout(()=>{p.site.visible=false;p.g.visible=true;p.g.position.y=3.2;drops.push({p,t:0});},650+n*600));
+  setTimeout(()=>toast("島上蓋好了："+ps.map(p=>p.name).join("、")),700);
+}
+function burst(x,y,z,n=26){
+  const cs=["#DB6A41","#FCDD6B","#5EC4CC","#E25C9A","#3E9B5A","#FFFFFF"];
+  for(let k=0;k<n;k++){const m=new THREE.Mesh(new THREE.BoxGeometry(0.07,0.07,0.07),M(cs[k%cs.length]));m.position.set(x,y,z);scene.add(m);
+    const a=Math.random()*Math.PI*2,s=0.8+Math.random()*1.2;sparks.push({m,v:new THREE.Vector3(Math.cos(a)*s,2.5+Math.random()*2,Math.sin(a)*s),life:1.3});}
+}
+const bounce=k=>{const n=7.5625,d=2.75;if(k<1/d)return n*k*k;if(k<2/d)return n*(k-=1.5/d)*k+0.75;if(k<2.5/d)return n*(k-=2.25/d)*k+0.9375;return n*(k-=2.625/d)*k+0.984375;};
+function updateFx(dt){
+  for(let i=drops.length-1;i>=0;i--){const d=drops[i];d.t+=dt;const k=Math.min(1,d.t/0.8);d.p.g.position.y=(1-bounce(k))*3.2;
+    if(k>=1){d.p.g.position.y=0;burst(d.p.t.wx,d.p.t.top+0.4,d.p.t.wz);drops.splice(i,1);}}
+  for(let i=sparks.length-1;i>=0;i--){const s=sparks[i];s.life-=dt;s.v.y-=6*dt;s.m.position.addScaledVector(s.v,dt);s.m.rotation.x+=dt*6;s.m.rotation.y+=dt*4;
+    if(s.life<=0){scene.remove(s.m);s.m.geometry.dispose();sparks.splice(i,1);}}
+}
+
+/* ============ 故事任務：雞蛋與瓦片（p.194–195、p.200–201） ============ */
+const STORY=[
+  {title:"人物介紹",at:[2,0],dim:"理解",say:"〈雞蛋與瓦片〉的故事從兩兄弟開始。他們住在一起，個性卻一點都不一樣。",
+   q:mc("第一段要描述人物特質與差異。下列哪一組詞彙最適合這個情境？",["害羞、隨性、看起來、個性不一樣","派／指派、不小心、弄破、趕緊","屋頂、瓦片、踩破、哼歌","不悅、皺眉、沮喪、誤會"],0,"「說明人物個性」情境可引出：害羞、隨性、看起來、個性不一樣，重點是描述人物特質與比較差異。（p.194）")},
+  {title:"買雞蛋",at:[3,1],dim:"表達",say:"奶奶派人到市場買雞蛋。雞蛋買到了，可是回去的路上好像會出事……",after:"你提著一籃雞蛋。帶去課文圖書館找奶奶吧！",
+   q:mc("描述「被指派做事與意外發生」時，可以引出哪些詞彙？",["害羞、隨性、看起來","派／指派、不小心、弄破、急忙／趕緊","屋頂、瓦片、幸好、哼歌","不悅、皺眉、沮喪"],1,"「買雞蛋與意外」情境可引出：派／指派、不小心、弄破、急忙／趕緊。（p.194）")},
+  {title:"被誤會",at:[4,0],dim:"表達",say:"雞蛋破了。奶奶看到之後，誤會了阿湯。阿湯皺著眉頭，心情很低落。",
+   q:mc("「被責備與情緒反應」這一段，教學重點是什麼？",["描述空間、事件結果與轉折","表達情緒與人物心理狀態","描述人物特質與比較差異","描述被指派做事與意外發生"],1,"這段可引出：不悅、皺眉、沮喪、誤會，重點是表達情緒與人物心理狀態。（p.194–195）")},
+  {title:"屋頂事件",at:[2,3],dim:"表達",say:"阿湯爬上屋頂看海，接著又發生了踩破瓦片的事件。最後，請把整個故事的段落排好。",
+   q:od("看圖說故事：把〈雞蛋與瓦片〉的四個段落照順序排好。",["人物介紹","買雞蛋","被誤會","屋頂事件"],"高級別課文要掌握段落功能：人物介紹 → 買雞蛋 → 被誤會 → 屋頂事件。也可以讓學生從哥哥、弟弟、奶奶或旁觀者的角度重新說一次。（p.200–201）")}
+];
+const storyStations=STORY.map(s=>{
+  const p=islandProps[s.at[0]][s.at[1]];
+  const near=nbrs(p.t).filter(n=>walk(n)&&n.island===s.at[0]).sort((a,b)=>b.wz-a.wz);
+  return near[0]||islandTiles[s.at[0]][0];
+});
+const storyStage=()=>Math.min(prog.story||0,STORY.length);
+const storyMark=new THREE.Group();scene.add(storyMark);
+const bookG=new THREE.Group();storyMark.add(bookG);
+[-1,1].forEach(s=>{const pg=mesh(new THREE.BoxGeometry(0.22,0.02,0.3),M("#FFFFFF"),s*0.1,0,0,bookG);pg.rotation.z=s*0.35;const cv=mesh(new THREE.BoxGeometry(0.23,0.015,0.32),M("#DB6A41"),s*0.1,-0.02,0,bookG);cv.rotation.z=s*0.35;});
+const halo=mesh(new THREE.RingGeometry(0.5,0.74,6),new THREE.MeshBasicMaterial({color:"#DB6A41",transparent:true,opacity:0.8,side:THREE.DoubleSide,depthWrite:false}),0,0.02,0,storyMark);
+halo.rotation.x=-Math.PI/2;halo.rotation.z=Math.PI/6;halo.castShadow=false;
+storyMark.traverse(o=>o.userData.story=true);
+const stag=document.createElement("div");stag.className="tag story";labelsEl.appendChild(stag);
+function placeStory(){
+  const k=storyStage();
+  if(k>=STORY.length){storyMark.visible=false;stag.style.display="none";return;}
+  const t=storyStations[k];storyMark.visible=true;storyMark.position.set(t.wx,t.top+0.08,t.wz);
+  stag.textContent=`故事 ${k+1}/${STORY.length}：${STORY[k].title}`;
+}
+animated.push(t=>{if(!storyMark.visible)return;bookG.position.y=0.95+Math.sin(t*2.2)*0.08;bookG.rotation.y=t*1.2;halo.material.opacity=0.45+Math.sin(t*4)*0.3;});
+// 第二段之後提著一籃雞蛋，送到奶奶那裡才放下
+const basket=new THREE.Group();basket.position.set(0,0.3,0.17);P.g.add(basket);
+mesh(new THREE.CylinderGeometry(0.09,0.07,0.08,12),M("#B07A45"),0,0,0,basket);
+[[-0.03,0],[0.03,0.01],[0,-0.03]].forEach(([a,b])=>{const e=mesh(new THREE.SphereGeometry(0.03,8,6),M("#FFF9EE"),a,0.05,b,basket);e.scale.y=1.3;});
+const syncBasket=()=>{basket.visible=storyStage()===2;};
+let lastStoryTile=null;
+function goStory(){
+  const k=storyStage();if(k>=STORY.length)return;
+  const t=storyStations[k];flyTo({x:t.wx,y:t.top,z:t.wz},12,0.85);
+  walkTo(t,()=>{lastStoryTile=t;openStory(k);});
+}
+
+/* ============ 小遊戲站：第六節的綜合活動 ============ */
+const GAMES=[
+  {id:"slot",name:"句型拉霸機",at:[3,4],dim:"表達",color:"#E25C9A",page:"p.196"},
+  {id:"match",name:"連連看",at:[5,1],dim:"形式",color:"#1F6FD1",page:"p.193–194、p.204"},
+  {id:"talk",name:"對話練習",at:[3,2],dim:"互動",color:"#3E9B5A",page:"p.197–198"},
+  {id:"split",name:"語句拆合",at:[4,3],dim:"表達",color:"#7D4CB7",page:"p.199–200"}
+];
+const gamesDone=()=>GAMES.filter(g=>prog.games[g.id]).length;
+const usedSpots=new Set(storyStations.map(t=>K(t.q,t.r)));
+GAMES.forEach(gm=>{
+  const p=islandProps[gm.at[0]][gm.at[1]];
+  const free=n=>walk(n)&&n.island===gm.at[0]&&!usedSpots.has(K(n.q,n.r));
+  const t=nbrs(p.t).filter(free).sort((a,b)=>b.wz-a.wz)[0]||islandTiles[gm.at[0]].find(free);
+  usedSpots.add(K(t.q,t.r));gm.tile=t;
+  const g=new THREE.Group();g.position.set(t.wx,t.top+0.08,t.wz);scene.add(g);
+  const ring=mesh(new THREE.RingGeometry(0.5,0.74,6),new THREE.MeshBasicMaterial({color:gm.color,transparent:true,opacity:0.7,side:THREE.DoubleSide,depthWrite:false}),0,0.02,0,g);
+  ring.rotation.x=-Math.PI/2;ring.rotation.z=Math.PI/6;ring.castShadow=false;
+  const board=new THREE.Group();g.add(board);
+  sign(board,[gm.name],0,0,0,{w:0.66,h:0.2,post:0,bg:gm.color,fg:"#FFFFFF",edge:gm.color});
+  const star=mesh(new THREE.OctahedronGeometry(0.09),M("#FCDD6B",{emissive:"#FCDD6B",emissiveIntensity:0.5}),0,0.36,0,board);
+  g.traverse(o=>o.userData.game=gm);gm.g=g;
+  const ph=rnd()*6;
+  animated.push(t=>{board.position.y=0.78+Math.sin(t*2+ph)*0.06;star.rotation.y=t*2;star.visible=!prog.games[gm.id];ring.material.opacity=0.4+Math.sin(t*3+ph)*0.25;});
+});
+let lastGameTile=null;
+function goGame(gm){flyTo({x:gm.tile.wx,y:gm.tile.top,z:gm.tile.wz},12,0.85);walkTo(gm.tile,()=>{lastGameTile=gm.tile;openGame(gm);});}
+
+/* ============ 五面向（p.207） ============ */
+const DIMS=["理解","形式","表達","互動","文化"];
+const DIM_CODE="理理理理文形理表表理理表形表互理表理互形表互理文文文文文互形理理";
+RESIDENTS.forEach((r,i)=>r.dim=DIMS.find(d=>d[0]===DIM_CODE[i]));
+function dimStats(){
+  return DIMS.map(d=>{
+    const items=RESIDENTS.filter(r=>r.dim===d).map(isDone)
+      .concat(STORY.map((s,k)=>s.dim===d?storyStage()>k:null).filter(x=>x!==null))
+      .concat(GAMES.filter(g=>g.dim===d).map(g=>!!prog.games[g.id]));
+    return {d,n:items.filter(Boolean).length,t:items.length};
+  });
+}
+function radarSVG(){
+  const st=dimStats(),cx=130,cy=112,R=76,pt=(k,r)=>{const a=-Math.PI/2+k*2*Math.PI/5;return [+(cx+Math.cos(a)*r).toFixed(1),+(cy+Math.sin(a)*r).toFixed(1)];};
+  let s=`<svg viewBox="0 0 260 228" role="img" aria-label="五面向學習雷達圖" style="width:100%;max-width:290px;display:block;margin:6px auto 0">`;
+  [1/3,2/3,1].forEach(f=>{s+=`<polygon points="${DIMS.map((_,k)=>pt(k,R*f).join(",")).join(" ")}" fill="${f===1?"#FDF0E7":"none"}" stroke="#E9D6C8" stroke-width="1"/>`;});
+  DIMS.forEach((_,k)=>{const [x,y]=pt(k,R);s+=`<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="#E9D6C8"/>`;});
+  const vals=st.map((o,k)=>pt(k,R*Math.max(0.05,o.n/o.t)));
+  s+=`<polygon points="${vals.map(p=>p.join(",")).join(" ")}" fill="rgba(219,106,65,.3)" stroke="#DB6A41" stroke-width="2.5" stroke-linejoin="round"/>`;
+  vals.forEach(([x,y])=>{s+=`<circle cx="${x}" cy="${y}" r="3.5" fill="#DB6A41"/>`;});
+  st.forEach((o,k)=>{const [x,y]=pt(k,R+24);s+=`<text x="${x}" y="${y-5}" text-anchor="middle" font-size="12.5" font-weight="700" fill="#211D1D">${o.d}</text><text x="${x}" y="${y+10}" text-anchor="middle" font-size="11.5" fill="#B9502C" font-style="italic" font-family="Fraunces,Georgia,serif">${o.n}/${o.t}</text>`;});
+  return s+`</svg>`;
+}
+const radarCard=()=>`<div class="card"><b>學習雷達 · 對應 p.207 的五個評量面向</b>${radarSVG()}<span style="font-size:12px;color:var(--muted)">每一題依內容歸入一個面向；數字是已完成／總數，含故事任務與小遊戲。</span></div>`;
+
+/* ============ 行為 ============ */
+let paused=false,follow=false,topView=false,clock=new THREE.Clock(),T=0;
+function stepAlong(a,dt,speed){
+  if(!a.path.length) return false;
+  const n=a.path[0],tx=n.wx,tz=n.wz,ty=n.top+0.08;
+  const p=a.g.position,dx=tx-p.x,dz=tz-p.z,d=Math.hypot(dx,dz);
+  if(d<0.04){p.set(tx,ty,tz);a.tile=n;a.path.shift();return a.path.length>0;}
+  const s=Math.min(d,speed*dt);p.x+=dx/d*s;p.z+=dz/d*s;p.y+= (ty-p.y)*Math.min(1,dt*10);
+  const want=Math.atan2(dx,dz);let diff=want-a.g.rotation.y;diff=Math.atan2(Math.sin(diff),Math.cos(diff));a.g.rotation.y+=diff*Math.min(1,dt*10);
+  return true;
+}
+function animateLimbs(a,moving,t,dt){
+  if(moving){const s=Math.sin(t*10+a.phase||0)*0.6;a.legL.rotation.x=s;a.legR.rotation.x=-s;a.armL.rotation.x=-s*0.8;a.armR.rotation.x=s*0.8;a.armL.rotation.z=a.armR.rotation.z=0;}
+  else if(a.sign>0){ // "signing": both hands up in front, alternating
+    const k=t*5+a.phase;a.legL.rotation.x*=0.8;a.legR.rotation.x*=0.8;
+    a.armL.rotation.x=-1.25+Math.sin(k)*0.35;a.armR.rotation.x=-1.1+Math.cos(k*1.3)*0.4;a.armL.rotation.z=0.25+Math.sin(k*0.7)*0.15;a.armR.rotation.z=-0.25-Math.cos(k*0.9)*0.15;
+  } else {[a.legL,a.legR,a.armL,a.armR].forEach(l=>{l.rotation.x*=0.85;l.rotation.z*=0.85;});}
+}
+function updateResidents(dt,t){
+  for(const a of actors){
+    const moving=!paused&&!a.frozen&&stepAlong(a,dt,0.9);
+    if(!paused&&!a.frozen&&!a.path.length){
+      a.wait-=dt; if(a.sign>0)a.sign-=dt;
+      if(a.wait<=0){
+        if(rnd()<0.45){a.sign=2.5+rnd()*2;a.wait=a.sign+0.5;}
+        else{const opts=nbrs(a.tile).filter(n=>n.island===a.res.island&&walk(n));if(opts.length)a.path=[opts[Math.floor(rnd()*opts.length)]];a.wait=1.5+rnd()*3;}
+      }
+    }
+    if(a.frozen) a.sign=0;
+    animateLimbs(a,moving,t,dt);
+    const locked=isLocked(a.res),done=isDone(a.res);
+    a.mk.visible=!done; a.mk.material=locked?M("#9AA6B2",{emissive:"#000"}):M("#F2B705",{emissive:"#F2B705",emissiveIntensity:0.45});
+    a.mk.position.y=1.02+Math.sin(t*3+a.phase)*0.06; a.mk.rotation.y=t*2;
+  }
+}
+function updatePlayer(dt,t){
+  const moving=stepAlong(player,dt,2.6);
+  animateLimbs(player,moving||player.path.length>0,t,dt);
+  if(basket.visible){player.armL.rotation.x=player.armR.rotation.x=-0.9;}
+  if(!player.path.length){
+    ringMark.visible=false;if(player.onArrive){const f=player.onArrive;player.onArrive=null;f();}
+    // walking onto the orange story ring opens the next part of the story
+    const st=storyStations[storyStage()];
+    if(st&&player.tile===st){if(lastStoryTile!==st&&!veil){lastStoryTile=st;openStory(storyStage());}}
+    else lastStoryTile=null;
+    const gs=GAMES.find(gm=>gm.tile===player.tile);
+    if(gs){if(lastGameTile!==gs.tile&&!veil){lastGameTile=gs.tile;openGame(gs);}}
+    else lastGameTile=null;
+  }
+}
+function walkTo(tile,cb){
+  let path=bfs(player.tile,tile);
+  if(!path){ if(cb) cb(); return; }
+  path.shift(); player.path=path; player.onArrive=cb||null;
+  if(path.length){ringMark.visible=true;ringMark.position.set(tile.wx,tile.top+0.1,tile.wz);} else if(cb){player.onArrive=null;cb();}
+}
+function approach(r){
+  const a=r.actor; a.frozen=true; a.path=[];
+  const adj=nbrs(a.tile).filter(walk);
+  let best=null,bl=1e9;
+  for(const n of adj){const p=bfs(player.tile,n);if(p&&p.length<bl){bl=p.length;best=n;}}
+  if(K(player.tile.q,player.tile.r)===K(a.tile.q,a.tile.r)) best=player.tile;
+  const done=()=>{a.g.rotation.y=Math.atan2(player.g.position.x-a.g.position.x,player.g.position.z-a.g.position.z);player.g.rotation.y=a.g.rotation.y+Math.PI;openDialog(r);};
+  if(best) walkTo(best,done); else done();
+}
+
+/* camera tween */
+let tween=null;
+function flyTo(target,dist=16,polar=0.85){
+  const off=camera.position.clone().sub(controls.target);const az=Math.atan2(off.x,off.z);
+  const to=new THREE.Vector3(target.x+Math.sin(az)*Math.sin(polar)*dist,target.y+Math.cos(polar)*dist,target.z+Math.cos(az)*Math.sin(polar)*dist);
+  tween={t:0,fromP:camera.position.clone(),fromT:controls.target.clone(),toP:to,toT:new THREE.Vector3(target.x,target.y,target.z)};
+}
+function focusIsland(i){const c=centers[i],p=toW(c.q,c.r);topView=false;setPressed("tTop",false);flyTo({x:p.x,y:0.5,z:p.z},15,0.9);}
+
+/* picking */
+const ray=new THREE.Raycaster(),ndc=new THREE.Vector2();let downAt=null;
+renderer.domElement.addEventListener("pointerdown",e=>{downAt=[e.clientX,e.clientY];});
+renderer.domElement.addEventListener("pointerup",e=>{
+  if(!downAt||Math.hypot(e.clientX-downAt[0],e.clientY-downAt[1])>6||e.button!==0){downAt=null;return;}
+  downAt=null;
+  const r=renderer.domElement.getBoundingClientRect();ndc.set((e.clientX-r.left)/r.width*2-1,-(e.clientY-r.top)/r.height*2+1);
+  ray.setFromCamera(ndc,camera);
+  const hits=ray.intersectObjects([storyMark].concat(GAMES.map(g=>g.g),actors.map(a=>a.g),landmarkGroups,tileMeshes),true);
+  for(const h of hits){
+    const u=h.object.userData;
+    if(u.game){goGame(u.game);return;}
+    if(u.story){if(storyMark.visible){goStory();return;}continue;}
+    if(u.resident){approach(u.resident);openIsland(u.resident.island,true);return;}
+    if(u.island!==undefined&&!u.tile){openIsland(u.island);return;}
+    if(u.tile){if(walk(u.tile))walkTo(u.tile);if(u.tile.island>=0)openIsland(u.tile.island,true);return;}
+  }
+});
+
+/* labels */
+const v3=new THREE.Vector3();
+function place(el,x,y,z){v3.set(x,y,z).project(camera);if(v3.z>1){el.style.display="none";return;}el.style.display="";el.style.left=((v3.x+1)/2*stage.clientWidth)+"px";el.style.top=((1-v3.y)/2*stage.clientHeight)+"px";}
+function updateLabels(){
+  pins.forEach((p,i)=>{const c=centers[i],w=toW(c.q,c.r);place(p,w.x,ISLANDS[i].center?3.6:3.0,w.z);});
+  actors.forEach(a=>place(a.tag,a.g.position.x,a.g.position.y+1.35,a.g.position.z));
+  place(ptag,player.g.position.x,player.g.position.y+1.15,player.g.position.z);
+  if(storyMark.visible) place(stag,storyMark.position.x,storyMark.position.y+1.45,storyMark.position.z);
+}
+
+/* time of day */
+const TIMES=[{n:"白天",bg:"#F8E4D2",hemi:0.95,sun:1.1,sc:"#FFE9CF",w:"#5EC4CC"},{n:"黃昏",bg:"#F6BE96",hemi:0.7,sun:0.9,sc:"#FFAE72",w:"#55A9BE"},{n:"夜晚",bg:"#2E2C55",hemi:0.4,sun:0.3,sc:"#B9B4FF",w:"#2A4F78",night:true}];
+let timeIdx=0;
+function applyTime(){const T0=TIMES[timeIdx];scene.background.set(T0.bg);scene.fog.color.set(T0.bg);stage.style.background=T0.bg;hemi.intensity=T0.hemi;sun.intensity=T0.sun;sun.color.set(T0.sc);water.material.color.set(T0.w);scene.userData.night=!!T0.night;document.getElementById("tTimeL").textContent=T0.n;}
+
+/* loop */
+function resize(){const w=stage.clientWidth,h=stage.clientHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}
+new ResizeObserver(resize).observe(stage);resize();
+if(camera.aspect<1) camera.position.set(0,58,66); // narrow screens: start farther out so the whole ring fits
+function loop(){
+  const dt=Math.min(clock.getDelta(),0.05);T+=dt;
+  if(!paused){boats.forEach(b=>{b.a+=b.s*dt;b.g.position.set(Math.cos(b.a)*b.r,0.04+Math.sin(T*2+b.r)*0.03,Math.sin(b.a)*b.r);b.g.rotation.y=-b.a;});clouds.forEach(c=>{c.position.x+=dt*0.4;if(c.position.x>40)c.position.x=-40;});}
+  animated.forEach(f=>f(T,!paused));
+  updateResidents(dt,T);updatePlayer(dt,T);updateFx(dt);
+  if(tween){tween.t=Math.min(1,tween.t+dt/0.9);const k=1-Math.pow(1-tween.t,3);camera.position.lerpVectors(tween.fromP,tween.toP,k);controls.target.lerpVectors(tween.fromT,tween.toT,k);if(tween.t>=1)tween=null;}
+  else if(follow){const p=player.g.position,d=p.clone().sub(controls.target);d.y=0;controls.target.add(d.multiplyScalar(Math.min(1,dt*3)));camera.position.add(d);}
+  // keep the view near the archipelago
+  const tg=controls.target;const L=Math.hypot(tg.x,tg.z);if(L>22){const f=22/L,dx=tg.x*(f-1),dz=tg.z*(f-1);tg.x+=dx;tg.z+=dz;camera.position.x+=dx;camera.position.z+=dz;}
+  controls.update();updateLabels();renderer.render(scene,camera);requestAnimationFrame(loop);
+}
+applyTime();requestAnimationFrame(loop);
+
+/* ============ UI ============ */
+const $=id=>document.getElementById(id);
+const pBody=$("pBody");
+function setPressed(id,v){$(id).setAttribute("aria-pressed",v);}
+$("tTags").onclick=()=>{const on=$("tTags").getAttribute("aria-pressed")!=="true";setPressed("tTags",on);labelsEl.classList.toggle("hide-tags",!on);};
+$("tFollow").onclick=()=>{follow=!follow;setPressed("tFollow",follow);if(follow){topView=false;setPressed("tTop",false);flyTo({x:player.g.position.x,y:player.g.position.y,z:player.g.position.z},12,0.85);}};
+$("tTop").onclick=()=>{topView=!topView;setPressed("tTop",topView);follow=false;setPressed("tFollow",false);if(topView)flyTo({x:0,y:0,z:0.5},48,0.06);else flyTo({x:0,y:0,z:1},45,0.85);};
+$("tPause").onclick=()=>{paused=!paused;setPressed("tPause",paused);};
+$("tTime").onclick=()=>{timeIdx=(timeIdx+1)%TIMES.length;applyTime();};
+$("tHelp").onclick=()=>tutorial(0);
+
+let tab="isl",view={k:"home"};
+$("tabIsl").onclick=()=>{tab="isl";view={k:"home"};renderPanel();};
+$("tabLog").onclick=()=>{tab="log";renderPanel();};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const resOf=i=>RESIDENTS.filter(r=>r.island===i);
+function dots(i){return `<span class="dots">${resOf(i).map(r=>`<i class="${isDone(r)?"on":""}"></i>`).join("")}</span>`;}
+function faceHTML(r,cls="face"){return `<span class="${cls}" style="background:${r.look[0]}">${esc(r.name[0])}</span>`;}
+
+function renderHeader(){
+  const rd=RESIDENTS.filter(isDone).length,gd=gamesDone(),d=rd+gd,t=RESIDENTS.length+GAMES.length;
+  $("brickCount").textContent=`${d}/${t}`;$("meterBar").style.width=(d/t*100)+"%";
+  $("meterTxt").textContent=`已學會 ${rd} 位島民 · 完成 ${gd} 個小遊戲`;$("meterPct").textContent=Math.round(d/t*100)+"%";
+  pins.forEach((p,i)=>{const rs=resOf(i),n=rs.filter(isDone).length;p.querySelector("i").textContent=`${n}/${rs.length}`;p.classList.toggle("done",n===rs.length);});
+}
+function renderPanel(){
+  renderHeader();
+  $("tabIsl").setAttribute("aria-selected",tab==="isl");$("tabLog").setAttribute("aria-selected",tab==="log");
+  if(tab==="log") return renderLog();
+  if(view.k==="island") return renderIsland(view.i);
+  pBody.innerHTML=`<p class="prose" style="color:var(--muted);font-size:13.5px">每座島對應本章一節。和島民對話、答對問題，島上的「待建造」工地就會蓋起來。集滿八座島的積木，心島就會亮起。</p>`+storyCard()+gamesCard()+
+    ISLANDS.map((I,i)=>`<button class="isl" data-i="${i}"><span class="hexnum" style="background:${I.color}">${I.no}</span><span><h3>${esc(I.name)}</h3><small>第${I.no}節 · ${esc(I.title)}</small></span>${dots(i)}</button>`).join("");
+  pBody.querySelectorAll(".isl").forEach(b=>b.onclick=()=>{const i=+b.dataset.i;openIsland(i);focusIsland(i);});
+  if($("goStory"))$("goStory").onclick=goStory;
+  bindGameButtons();
+}
+function gameRows(list){return list.map(g=>`<button class="res" data-g="${g.id}"><span class="face" style="background:${g.color}">遊</span><div><strong>${esc(g.name)}</strong><small>${esc(ISLANDS[g.at[0]].name)} · ${g.page}</small></div><span class="state ${prog.games[g.id]?"ok":""}">${prog.games[g.id]?"已完成":"去玩"}</span></button>`).join("");}
+function gamesCard(){return `<div class="card"><b>小遊戲　${gamesDone()}/${GAMES.length} · 第六節的綜合活動</b><div style="display:flex;flex-direction:column;gap:6px;margin-top:6px">${gameRows(GAMES)}</div></div>`;}
+function bindGameButtons(){pBody.querySelectorAll("[data-g]").forEach(b=>b.onclick=()=>goGame(GAMES.find(g=>g.id===b.dataset.g)));}
+function storyCard(){
+  const k=storyStage(),done=k>=STORY.length;
+  return `<div class="card" style="border-color:var(--brick)"><b style="color:var(--brick)">故事任務 · 雞蛋與瓦片　${k}/${STORY.length}</b>`+
+    (done?"四個段落都完成了！到學習日誌可以複習每一段。"
+         :`下一段：<strong>${esc(STORY[k].title)}</strong>（${esc(ISLANDS[STORY[k].at[0]].name)}）。地上的橘色六角圈就是故事點，走過去就會開始。<div class="row" style="margin-top:8px"><button class="btn" id="goStory">帶我去</button></div>`)+`</div>`;
+}
+function renderIsland(i){
+  const I=ISLANDS[i];
+  pBody.innerHTML=`<button class="back" id="bk">← 全部島嶼</button>
+   <div style="display:flex;gap:12px;align-items:center"><span class="hexnum" style="background:${I.color}">${I.no}</span><div><h3 class="sec-title">${esc(I.name)}</h3><div class="meta">第${I.no}節　${esc(I.title)}　${I.page}</div></div></div>
+   <p class="prose">${esc(I.summary)}</p>
+   <h4>重點積木</h4><ul class="keylist">${I.points.map(p=>`<li>${esc(p)}</li>`).join("")}</ul>
+   <div class="mnemo"><b>${esc(I.tipT)}</b>${esc(I.tip)}</div>
+   ${i===7?radarCard():""}
+   <h4>島上建設 ${islandProps[i].filter(p=>p.built).length}/${islandProps[i].length}</h4>
+   <div class="keylist" style="flex-direction:row;flex-wrap:wrap">${islandProps[i].map(p=>`<span class="state ${p.built?"ok":""}">${esc(p.name)}</span>`).join("")}</div>
+   ${GAMES.some(g=>g.at[0]===i)?`<h4>島上的小遊戲</h4>${gameRows(GAMES.filter(g=>g.at[0]===i))}`:""}
+   <h4>島民（點一下就會走過去）</h4>
+   ${resOf(i).map(r=>`<button class="res" data-id="${r.id}">${faceHTML(r)}<div><strong>${esc(r.name)}</strong><small>${esc(r.role)} · ${r.q.type==="order"?"排序挑戰":"選擇題"}</small></div><span class="state ${isDone(r)?"ok":""}">${isDone(r)?"已學會":isLocked(r)?"未解鎖":"待對話"}</span></button>`).join("")}`;
+  $("bk").onclick=()=>{view={k:"home"};renderPanel();};
+  pBody.querySelectorAll(".res[data-id]").forEach(b=>b.onclick=()=>{const r=RESIDENTS.find(x=>x.id===b.dataset.id);approach(r);flyTo(r.actor.g.position,12,0.85);});
+  bindGameButtons();
+}
+function renderLog(){
+  const done=RESIDENTS.filter(isDone);
+  const sk=storyStage();
+  const storyLog=sk?`<h4 style="color:var(--brick)">故事任務 · 雞蛋與瓦片</h4>`+STORY.slice(0,sk).map((s,k)=>`<div class="card"><b>第 ${k+1} 段 · ${esc(s.title)}</b>${esc(s.say)}<br>${esc(s.q.explain)}</div>`).join(""):"";
+  if(!done.length&&!sk){pBody.innerHTML=radarCard()+`<div class="empty">日誌還是空的。和島民對話、答對問題後，學到的知識會收進這裡，方便你複習。<br><br>建議從<b>政策港</b>（第一節）開始。</div>`;return;}
+  pBody.innerHTML=radarCard()+storyLog+ISLANDS.map((I,i)=>{const rs=resOf(i).filter(isDone);if(!rs.length)return"";return `<h4 style="color:${I.color}">第${I.no}節 · ${esc(I.name)}</h4>`+rs.map(r=>`<div class="card"><b>${esc(r.name)}的問題</b>${esc(r.q.prompt.replace(/\n/g," "))}<br><span style="color:var(--ok);font-weight:700">✓ ${esc(r.q.type==="order"?r.q.tokens.join("　"):r.q.options[r.q.answer])}</span><br>${esc(r.q.explain)}</div>`).join("");}).join("")+
+  (done.length===RESIDENTS.length?`<button class="btn" id="cert">查看島民證</button>`:"")+
+  `<button class="btn ghost" id="reset" style="margin-top:8px">清除進度重新開始</button>`;
+  if($("cert"))$("cert").onclick=certificate;
+  $("reset").onclick=()=>{const b=$("reset");if(b.dataset.c){prog.done={};prog.story=0;prog.games={};save();location.reload();}else{b.dataset.c=1;b.textContent="再按一次確認清除";}};
+}
+function openIsland(i,soft){if(soft&&tab==="log")return;tab="isl";view={k:"island",i};renderPanel();}
+
+/* modal */
+let veil=null;
+function closeModal(){if(veil){veil.remove();veil=null;}actors.forEach(a=>a.frozen=false);playBuilds();}
+function modal(html){closeModal();veil=document.createElement("div");veil.className="veil";veil.innerHTML=`<div class="modal" role="dialog" aria-modal="true">${html}</div>`;document.body.appendChild(veil);veil.addEventListener("click",e=>{if(e.target===veil)closeModal();});return veil.firstChild;}
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
+function toast(msg){const t=document.createElement("div");t.className="toast";t.textContent=msg;document.body.appendChild(t);setTimeout(()=>t.style.opacity=0,1600);setTimeout(()=>t.remove(),2000);}
+const shuffle=a=>{const b=a.slice();for(let i=b.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[b[i],b[j]]=[b[j],b[i]];}if(b.join()===a.join()&&b.length>1)[b[0],b[1]]=[b[1],b[0]];return b;};
+
+function openDialog(r,practice=false){
+  r.actor.frozen=true;
+  const I=ISLANDS[r.island];
+  const head=`<div class="m-head">${faceHTML(r)}<div><h3>${esc(r.name)}</h3><small>${esc(r.role)} · ${esc(I.name)}</small></div><button class="close" aria-label="關閉">×</button></div>`;
+  if(isLocked(r)){
+    const left=ringTotal-ringDone();
+    const m=modal(head+`<div class="bubble">歡迎來到心島！心島的光要靠八座島的積木才能點亮。你還差 <b>${left}</b> 塊積木，先去其他島找島民聊聊吧。</div><div class="row"><button class="btn" id="go">看看還有誰沒聊過</button></div>`);
+    m.querySelector(".close").onclick=closeModal;m.querySelector("#go").onclick=()=>{closeModal();tab="isl";view={k:"home"};renderPanel();};return;
+  }
+  const q=r.q;
+  if(isDone(r)&&!practice){
+    const ans=q.type==="order"?q.tokens.join("　"):q.options[q.answer];
+    const m=modal(head+`<div class="bubble">謝謝你來找我！我們聊過的重點，你已經學會了。</div>
+      <div class="feedback ok"><b>你學會的重點</b><br>${esc(q.prompt).replace(/\n/g,"<br>")}<br><span style="color:var(--ok);font-weight:700">✓ ${esc(ans)}</span><br>${esc(q.explain)}</div>
+      <div class="row"><button class="btn" id="nx">繼續探索</button><button class="btn ghost" id="pr">再練習一次（不給積木）</button></div>`);
+    m.querySelector(".close").onclick=closeModal;m.querySelector("#nx").onclick=closeModal;
+    m.querySelector("#pr").onclick=()=>openDialog(r,true);
+    return;
+  }
+  const m=modal(head+`<div class="bubble">${esc(r.say)}</div>`+qHTML(q)+`<div id="fb"></div>`);
+  m.querySelector(".close").onclick=closeModal;
+  bindQuestion(m,q,"再想想看。提示："+esc(I.tip.slice(0,40))+(I.tip.length>40?"…":""),fb=>{
+    const first=!isDone(r);prog.done[r.id]=true;save();
+    fb.innerHTML=`<div class="feedback ok"><b>${first?"答對了！獲得一塊積木，島上有新建設要蓋起來了。":"練習完成！這題已經拿過積木了。"}</b><br>${esc(q.explain)}</div><div class="row"><button class="btn" id="nx">${first?"去看新建設":"繼續探索"}</button></div>`;
+    fb.querySelector("#nx").onclick=closeModal;
+    if(first){toast("+1 積木 🧱");syncBuild(true);renderPanel();
+      if(ringDone()===ringTotal&&r.island!==8)setTimeout(()=>toast("八座島都完成了！心島亮起來，去找島主吧"),2100);
+      if(RESIDENTS.every(isDone))setTimeout(certificate,900);}
+  });
+  if(practice) m.querySelector("#fb").innerHTML=`<div class="feedback ok" style="margin-top:12px"><b>練習模式</b>：這題已經拿過積木，答對不會再加積木。</div>`;
+}
+function qHTML(q){
+  return `<div class="q">${esc(q.prompt).replace(/\n/g,"<br>")}</div>`+(q.type==="mc"
+    ?`<div class="opts">${q.options.map((o,i)=>`<button class="opt" data-i="${i}">${String.fromCharCode(65+i)}．${esc(o)}</button>`).join("")}</div>`
+    :`<div class="slot" id="slot" aria-label="你的排列"></div><div class="pool" id="pool"></div><div class="row"><button class="btn" id="chk">確認</button><button class="btn ghost" id="clr">重排</button></div>`);
+}
+function bindQuestion(m,q,hint,onWin){
+  const fb=m.querySelector("#fb"),win=()=>onWin(fb);
+  const lose=msg=>{fb.innerHTML=`<div class="feedback no">${msg}</div>`;};
+  if(q.type==="mc"){
+    m.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{
+      const i=+b.dataset.i;
+      if(i===q.answer){b.classList.add("right");m.querySelectorAll(".opt").forEach(x=>x.disabled=true);win();}
+      else{b.classList.remove("wrong");void b.offsetWidth;b.classList.add("wrong");lose(hint);}
+    });
+  } else {
+    const pool=m.querySelector("#pool"),slot=m.querySelector("#slot");let order=[];const sh=shuffle(q.tokens);
+    const draw=()=>{
+      pool.innerHTML=sh.map((t,i)=>`<button class="tk" data-i="${i}" ${order.includes(i)?"disabled":""}>${esc(t)}</button>`).join("");
+      slot.innerHTML=order.length?order.map((i,k)=>`<button class="tk" data-k="${k}">${esc(sh[i])}</button>`).join(""):`<span style="color:var(--muted);font-size:13px">點下方的詞卡，依序放進來</span>`;
+      pool.querySelectorAll(".tk").forEach(b=>b.onclick=()=>{order.push(+b.dataset.i);draw();});
+      slot.querySelectorAll(".tk").forEach(b=>b.onclick=()=>{order.splice(+b.dataset.k,1);draw();});
+    };draw();
+    m.querySelector("#clr").onclick=()=>{order=[];draw();fb.innerHTML="";};
+    m.querySelector("#chk").onclick=()=>{
+      if(order.length<q.tokens.length)return lose("還有詞卡沒放進去喔。");
+      if(order.map(i=>sh[i]).join("|")===q.tokens.join("|")){m.querySelector("#chk").disabled=true;win();}
+      else lose("順序還不對。記得：臺灣手語有自己的語序，不是照華語逐字排列。");
+    };
+  }
+}
+
+function openStory(k){
+  const s=STORY[k];
+  const m=modal(`<div class="m-head"><span class="face" style="background:var(--brick)">故</span><div><h3>${esc(s.title)}</h3><small>故事任務 · 雞蛋與瓦片 · 第 ${k+1}/${STORY.length} 段 · ${esc(ISLANDS[s.at[0]].name)}</small></div><button class="close" aria-label="關閉">×</button></div><div class="bubble">${esc(s.say)}</div>`+qHTML(s.q)+`<div id="fb"></div>`);
+  m.querySelector(".close").onclick=closeModal;
+  bindQuestion(m,s.q,"再想想看：先想清楚這一段情境要完成什麼溝通功能。",fb=>{
+    prog.story=k+1;save();placeStory();syncBasket();renderPanel();
+    const last=k+1>=STORY.length,nx=STORY[k+1];
+    fb.innerHTML=`<div class="feedback ok"><b>${last?"故事完成！你拿到「雞蛋與瓦片」故事徽章。":"這一段完成了！"}</b><br>${esc(s.q.explain)}`+
+      (last?"":`<br><br><b>下一段：</b>${esc(s.after||nx.title+"，在"+ISLANDS[nx.at[0]].name+"。")}`)+
+      `</div><div class="row"><button class="btn" id="nx">${last?"太好了":"前往下一段"}</button>${last?"":`<button class="btn ghost" id="st">先留在這裡</button>`}</div>`;
+    fb.querySelector("#nx").onclick=()=>{closeModal();if(last){const h=toW(centers[8].q,centers[8].r);burst(h.x,2.8,h.z,70);toast("故事徽章：雞蛋與瓦片");}else goStory();};
+    if(!last) fb.querySelector("#st").onclick=closeModal;
+  });
+}
+
+/* ============ 小遊戲 ============ */
+function openGame(gm){({slot:gameSlot,match:gameMatch,talk:gameTalk,split:gameSplit})[gm.id](gm);}
+function gameHead(gm,sub){return `<div class="m-head"><span class="face" style="background:${gm.color}">遊</span><div><h3>${esc(gm.name)}</h3><small>小遊戲 · ${esc(ISLANDS[gm.at[0]].name)} · ${esc(sub)}</small></div><button class="close" aria-label="關閉">×</button></div>`;}
+function gameWin(gm,fb,explain){
+  const first=!prog.games[gm.id];prog.games[gm.id]=true;save();
+  fb.innerHTML=`<div class="feedback ok"><b>${first?"完成小遊戲！獲得一塊積木。":"再次完成！這個小遊戲已經拿過積木了。"}</b><br>${explain}</div><div class="row"><button class="btn" id="nx">繼續探索</button><button class="btn ghost" id="again">再玩一次</button></div>`;
+  fb.querySelector("#nx").onclick=closeModal;fb.querySelector("#again").onclick=()=>openGame(gm);
+  if(first){toast("+1 積木 🧱");setTimeout(()=>burst(gm.tile.wx,gm.tile.top+0.9,gm.tile.wz,40),300);renderPanel();}
+}
+
+// 句型拉霸機：人＋做某事＋不（p.196）
+const SLOT={
+  reels:[["弟弟","哥哥","媽媽"],["睡覺","吃飯 按時","按時 吃飯","服藥 按時","去 菜市場 魚 買","買 魚 去 菜市場"],["不","要","一樣"]],
+  names:["人","做某事","結尾"],
+  rounds:[{zh:"弟弟不睡覺。",ans:["弟弟","睡覺","不"]},{zh:"弟弟不按時吃飯。",ans:["弟弟","吃飯 按時","不"]},{zh:"哥哥不去菜市場買魚。",ans:["哥哥","去 菜市場 魚 買","不"]}],
+  tips:["先看句子的主角是誰。","注意語序：臺灣手語說「吃飯 按時」「去 菜市場 魚 買」，不是照華語排列。","句型是「人＋做某事＋不」，沒有意願時句尾用「不」。"]
+};
+function gameSlot(gm){
+  let round=0;const idx=[1,4,2];
+  const m=modal(gameHead(gm,"句型：人＋做某事＋不")+`<div class="bubble">弟弟生病好幾天了，還是不按時吃藥：「弟弟 服藥 按時 不」。換掉人物和動作，就能說出新的句子！</div><div class="q" id="sq"></div><div class="reels" id="reels"></div><div class="row"><button class="btn ghost" id="spin">拉一下</button><button class="btn" id="chk">確認</button></div><div id="fb"></div>`);
+  m.querySelector(".close").onclick=closeModal;
+  const fb=m.querySelector("#fb"),reels=m.querySelector("#reels");
+  const draw=()=>{
+    m.querySelector("#sq").innerHTML=`第 ${round+1}/${SLOT.rounds.length} 題：用臺灣手語說「${esc(SLOT.rounds[round].zh)}」<br><span style="font-size:13px;color:var(--muted);font-weight:400">按 ▲▼ 換詞，或先拉一下碰碰運氣。</span>`;
+    reels.innerHTML=SLOT.reels.map((r,k)=>`<div class="reel"><button data-k="${k}" data-d="-1" aria-label="${SLOT.names[k]}上一個">▲</button><div class="win" id="w${k}">${esc(r[idx[k]])}</div><button data-k="${k}" data-d="1" aria-label="${SLOT.names[k]}下一個">▼</button><small>${SLOT.names[k]}</small></div>`).join("");
+    reels.querySelectorAll("button").forEach(b=>b.onclick=()=>{const k=+b.dataset.k,n=SLOT.reels[k].length;idx[k]=(idx[k]+(+b.dataset.d)+n)%n;m.querySelector("#w"+k).textContent=SLOT.reels[k][idx[k]];fb.innerHTML="";});
+  };
+  draw();
+  m.querySelector("#spin").onclick=()=>{
+    const ws=[0,1,2].map(k=>m.querySelector("#w"+k));ws.forEach(w=>w.classList.add("spin"));fb.innerHTML="";let ticks=0;
+    const iv=setInterval(()=>{ticks++;[0,1,2].forEach(k=>{if(ticks<8+k*4){idx[k]=Math.floor(Math.random()*SLOT.reels[k].length);ws[k].textContent=SLOT.reels[k][idx[k]];}else ws[k].classList.remove("spin");});if(ticks>=16)clearInterval(iv);},70);
+  };
+  m.querySelector("#chk").onclick=()=>{
+    const R=SLOT.rounds[round],got=idx.map((v,k)=>SLOT.reels[k][v]),bad=got.findIndex((v,k)=>v!==R.ans[k]);
+    if(bad>=0){fb.innerHTML=`<div class="feedback no">「${SLOT.names[bad]}」這一格還不對。${SLOT.tips[bad]}</div>`;return;}
+    round++;
+    if(round>=SLOT.rounds.length){m.querySelector("#chk").disabled=m.querySelector("#spin").disabled=true;gameWin(gm,fb,"句型「人＋做某事＋不」表達某人沒有意願做某事。替換人物、動作或地點，就能在相似情境中類推。（p.196）");}
+    else{fb.innerHTML=`<div class="feedback ok"><b>答對了！</b>「${esc(got.join(" "))}」。準備下一題。</div>`;setTimeout(()=>{if(m.isConnected)draw();},900);}
+  };
+}
+
+// 連連看：華語詞組 ↔ 臺灣手語表達（p.193–194、p.204）
+const PAIRS=[["辛苦地工作","工作 辛苦"],["輕鬆地工作","工作 輕鬆"],["努力地讀書","讀書 努力"],["減肥","減 瘦"],["老家","出生 家"],["你的手語名字是什麼？","你 臉 誰？"]];
+function gameMatch(gm){
+  const right=shuffle(PAIRS.map((_,i)=>i)),done=new Set(),colors=["#DB6A41","#1F6FD1","#3E9B5A","#E25C9A","#7D4CB7","#F07F1A"];let sel=null;
+  const m=modal(gameHead(gm,"華語詞組 ↔ 臺灣手語表達")+`<div class="bubble">左邊是華語，右邊是臺灣手語的表達。先點左邊一張，再點右邊和它配對的那張。</div><div class="match" id="mt"><svg id="mlines" aria-hidden="true"></svg><div class="mcol">${PAIRS.map((p,i)=>`<button class="mcell" data-l="${i}">${esc(p[0])}</button>`).join("")}</div><div class="mcol">${right.map(i=>`<button class="mcell" data-r="${i}">${esc(PAIRS[i][1])}</button>`).join("")}</div></div><div id="fb"></div>`);
+  m.querySelector(".close").onclick=closeModal;
+  const mt=m.querySelector("#mt"),svg=m.querySelector("#mlines"),fb=m.querySelector("#fb");
+  const lines=()=>{const b=mt.getBoundingClientRect();svg.setAttribute("viewBox",`0 0 ${b.width} ${b.height}`);
+    svg.innerHTML=[...done].map(i=>{const l=mt.querySelector(`[data-l="${i}"]`).getBoundingClientRect(),r=mt.querySelector(`[data-r="${i}"]`).getBoundingClientRect();
+      return `<line x1="${l.right-b.left}" y1="${l.top+l.height/2-b.top}" x2="${r.left-b.left}" y2="${r.top+r.height/2-b.top}" stroke="${colors[i]}" stroke-width="3.5" stroke-linecap="round"/>`;}).join("");};
+  mt.querySelectorAll("[data-l]").forEach(b=>b.onclick=()=>{if(done.has(+b.dataset.l))return;mt.querySelectorAll("[data-l]").forEach(x=>x.classList.remove("sel"));b.classList.add("sel");sel=+b.dataset.l;fb.innerHTML="";});
+  mt.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.r;if(done.has(i))return;
+    if(sel===null){fb.innerHTML=`<div class="feedback no">先點左邊的華語，再點右邊配對的手語表達。</div>`;return;}
+    if(i===sel){
+      done.add(i);[mt.querySelector(`[data-l="${i}"]`),b].forEach(x=>{x.classList.remove("sel");x.classList.add("ok");x.style.borderColor=colors[i];});sel=null;lines();fb.innerHTML="";
+      if(done.size===PAIRS.length)gameWin(gm,fb,"修飾動作狀態的詞可放在動作之後（工作 辛苦、讀書 努力）；「減 瘦」「出生 家」「你 臉 誰？」則顯示兩種語言取用的概念面向不同。（p.194、p.204）");
+    } else {b.classList.remove("bad");void b.offsetWidth;b.classList.add("bad");fb.innerHTML=`<div class="feedback no">這兩張不是一對。想想「${esc(PAIRS[sel][0])}」在臺灣手語裡怎麼表達。</div>`;}
+  });
+}
+
+// 對話練習：兄弟個性不一樣（p.197–198）
+const TALK=[
+  {ctx:"媽媽帶著兩個兒子在路上遇到朋友。你扮演媽媽，先介紹孩子。",opts:[["他們兩個 我 兒子。",""],["他們兩個 是 我 的 兒子。","本章的手語文本是「他們兩個 我 兒子」，不用照華語把「是」「的」逐字打出來。"],["他們兩個 害羞 誰？","這是朋友等一下才會問的問題，現在要先介紹孩子。"]]},
+  {them:"他們兩個 看起來 個性 一樣。",opts:[["不，哥哥 弟弟 他們兩個 個性 不一樣。",""],["哥哥 弟弟 個性 一樣。","情境裡兄弟的個性其實不一樣，媽媽要澄清。"],["他們兩個 我 兒子。","孩子已經介紹過了，要回應朋友說的「看起來個性一樣」。"]]},
+  {them:"他們兩個 害羞 誰？",opts:[["哥哥 隨性，弟弟 害羞。",""],["哥哥 害羞，弟弟 害羞。","兩個都害羞，就不是「個性不一樣」了。"],["不，他們兩個 一樣。","朋友問的是誰比較害羞，要說出是誰。"]]},
+  {ctx:"替換練習：換成姊姊和妹妹，說她們兩人的興趣不一樣。",opts:[["姊姊 妹妹 他們兩個 興趣 不一樣。",""],["姊姊 妹妹 興趣 他們兩個 不一樣。","句型順序是：人1＋人2＋他們兩個＋個性／興趣＋不一樣。"],["興趣 不一樣 姊姊 妹妹。","先說人物，再說「他們兩個」，最後才是興趣和「不一樣」。"]]}
+];
+function gameTalk(gm){
+  let step=0;
+  const m=modal(gameHead(gm,"媽媽與朋友的對話")+`<div class="chat" id="chat"></div><div class="q" id="tq" style="font-size:14px">你（媽媽）要怎麼回？</div><div class="opts" id="topts"></div><div id="fb"></div>`);
+  m.querySelector(".close").onclick=closeModal;
+  const chat=m.querySelector("#chat"),opts=m.querySelector("#topts"),fb=m.querySelector("#fb");
+  const add=(cls,who,text)=>{chat.insertAdjacentHTML("beforeend",`<div class="say ${cls}">${who?`<small>${who}</small>`:""}${esc(text)}</div>`);chat.scrollTop=chat.scrollHeight;};
+  const show=()=>{
+    const s=TALK[step];
+    if(s.ctx)add("ctx","",s.ctx);
+    if(s.them)add("them","朋友",s.them);
+    const order=shuffle(s.opts.map((_,i)=>i));
+    opts.innerHTML=order.map(i=>`<button class="opt" data-i="${i}">${esc(s.opts[i][0])}</button>`).join("");
+    opts.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{
+      const i=+b.dataset.i;
+      if(i!==0){b.classList.remove("wrong");void b.offsetWidth;b.classList.add("wrong");fb.innerHTML=`<div class="feedback no">${esc(s.opts[i][1])}</div>`;return;}
+      fb.innerHTML="";opts.innerHTML="";add("me","媽媽（你）",s.opts[0][0]);step++;
+      if(step>=TALK.length){m.querySelector("#tq").hidden=true;gameWin(gm,fb,"對話練習三步驟：說明對話情境 → 分配角色練習 → 替換人物、個性或興趣重新組合。學生在連續互動裡使用句型，而不只是會打單一句子。（p.198）");}
+      else setTimeout(()=>{if(m.isConnected)show();},500);
+    });
+  };
+  show();
+}
+
+// 語句拆合：我的家人（p.199–200）
+const SPLIT=[
+  {q:"爸爸辛苦地做什麼？",ans:["爸爸","工作","辛苦"],extra:["讀書"],why:"引出人物＋動作＋情形"},
+  {q:"媽媽呢？",ans:["媽媽","工作","辛苦"],extra:["爸爸"],why:"替換人物"},
+  {q:"爸爸媽媽呢？",ans:["爸爸","媽媽","工作","辛苦"],extra:["努力"],why:"合併人物"},
+  {q:"哥哥努力地做什麼？",ans:["哥哥","讀書","努力"],extra:["工作"],why:"引出第二組句子"},
+  {q:"你要對爸爸媽媽哥哥姊姊說什麼？",ans:["我","愛","你們"],extra:["辛苦"],why:"引出情感表達"}
+];
+function gameSplit(gm){
+  let step=0,pick=[],pool=[];const built=[];
+  const m=modal(gameHead(gm,"我的家人")+`<div class="bubble" id="sp-q"></div><div class="slot" id="slot"></div><div class="pool" id="pool"></div><div class="row"><button class="btn" id="chk">回答</button><button class="btn ghost" id="clr">重排</button></div><div class="text-build" id="tb"><b>拼出來的句子</b></div><div id="fb"></div>`);
+  m.querySelector(".close").onclick=closeModal;
+  const fb=m.querySelector("#fb"),slot=m.querySelector("#slot"),poolEl=m.querySelector("#pool"),tb=m.querySelector("#tb");
+  const drawTokens=()=>{
+    poolEl.innerHTML=pool.map((t,i)=>`<button class="tk" data-i="${i}" ${pick.includes(i)?"disabled":""}>${esc(t)}</button>`).join("");
+    slot.innerHTML=pick.length?pick.map((i,k)=>`<button class="tk" data-k="${k}">${esc(pool[i])}</button>`).join(""):`<span style="color:var(--muted);font-size:13px">點下方詞卡回答；有一張是多出來的</span>`;
+    poolEl.querySelectorAll(".tk").forEach(b=>b.onclick=()=>{pick.push(+b.dataset.i);drawTokens();});
+    slot.querySelectorAll(".tk").forEach(b=>b.onclick=()=>{pick.splice(+b.dataset.k,1);drawTokens();});
+  };
+  const drawStep=()=>{
+    const s=SPLIT[step];pick=[];pool=shuffle(s.ans.concat(s.extra));
+    m.querySelector("#sp-q").innerHTML=`<b>老師（${step+1}/${SPLIT.length}）：</b>${esc(s.q)}`;drawTokens();
+  };
+  const drawBuilt=(fresh)=>{tb.innerHTML=`<b>拼出來的句子</b>`+built.map((t,k)=>`<span class="${fresh&&k===built.length-1?"new":""}">${esc(t)}</span>`).join("");};
+  drawStep();
+  m.querySelector("#clr").onclick=()=>{pick=[];drawTokens();fb.innerHTML="";};
+  m.querySelector("#chk").onclick=()=>{
+    const s=SPLIT[step],got=pick.map(i=>pool[i]);
+    if(got.join(" ")!==s.ans.join(" ")){fb.innerHTML=`<div class="feedback no">${got.some(t=>s.extra.includes(t))?"有一張多出來的詞卡被放進去了。":"順序或內容還不對。"}提示：臺灣手語是「人物＋動作＋情形」，例如「工作 辛苦」。</div>`;return;}
+    built.push(s.ans.join(" "));drawBuilt(true);fb.innerHTML=`<div class="feedback ok"><b>對了！</b>這一步的目的：${esc(s.why)}。</div>`;step++;
+    if(step>=SPLIT.length){
+      m.querySelector("#chk").disabled=m.querySelector("#clr").disabled=true;slot.innerHTML="";poolEl.innerHTML="";m.querySelector("#sp-q").innerHTML="<b>完整課文</b>（加上姊姊）";
+      tb.innerHTML=`<b>完整課文 · 臺灣手語文本（p.193）</b><span class="new">爸爸 媽媽 工作 辛苦，</span><span class="new">哥哥 姊姊 讀書 努力。</span><span class="new">爸爸 媽媽 哥哥 姊姊，</span><span class="new">我 愛 你們。</span>`;
+      gameWin(gm,fb,"這種方式稱為「語句拆合」：先把較長的句子拆成容易回答的小單位，再逐步合併成完整課文。學生不只是模仿，而是在情境中理解、回答、組合與表達。（p.200）");
+    } else setTimeout(()=>{if(m.isConnected)drawStep();},700);
+  };
+}
+
+function certificate(){
+  const d=new Date();
+  const m=modal(`<div class="cert"><svg class="seal" viewBox="0 0 120 120"><polygon points="60,4 108,32 108,88 60,116 12,88 12,32" fill="#D7322B" stroke="#1B2A38" stroke-width="4"/><path d="M60 84c-16-11-24-19-24-28a12 12 0 0 1 24-3 12 12 0 0 1 24 3c0 9-8 17-24 28z" fill="#fff"/></svg>
+  <div class="eyebrow">手語心島 · 島民證</div><h3>你點亮了心島</h3>
+  <p class="prose">你和 ${RESIDENTS.length} 位島民對話，走完〈臺灣手語的教與學〉九節內容：從語言功能出發，結合情境脈絡與聾人文化，理解臺灣手語作為視覺語言的教學特性。</p>
+  ${storyStage()>=STORY.length?`<p class="prose" style="color:var(--brick);font-weight:700">另獲得故事徽章：雞蛋與瓦片</p>`:""}
+  ${radarSVG()}
+  <p class="meta">${d.getFullYear()}.${d.getMonth()+1}.${d.getDate()}</p>
+  <div class="row" style="justify-content:center"><button class="btn" id="ok">回到島上</button></div></div>`);
+  m.querySelector("#ok").onclick=closeModal;
+}
+
+// small legend icons for the guide, drawn to match what is on the island
+const IC={
+  hex:c=>`<svg viewBox="0 0 32 32"><polygon points="16,2 29,9.5 29,22.5 16,30 3,22.5 3,9.5" fill="${c}" stroke="#211D1D" stroke-opacity=".25" stroke-width="1.5"/></svg>`,
+  ring:c=>`<svg viewBox="0 0 32 32"><polygon points="16,4 27,10 27,22 16,28 5,22 5,10" fill="none" stroke="${c}" stroke-width="4.5"/></svg>`,
+  dia:c=>`<svg viewBox="0 0 32 32"><polygon points="16,3 26,16 16,29 6,16" fill="${c}" stroke="#211D1D" stroke-opacity=".3" stroke-width="1.5"/></svg>`,
+  site:`<svg viewBox="0 0 32 32"><rect x="5" y="20" width="22" height="6" rx="1.5" fill="#E6D8CA"/><path d="M8 20V7M24 20V7M7 8h18" stroke="#C2AE98" stroke-width="2"/><rect x="9" y="12" width="14" height="6" rx="1" fill="#FCDD6B" stroke="#E2B94A"/></svg>`,
+  brick:`<svg viewBox="0 0 32 32"><rect x="3" y="12" width="26" height="15" rx="2.5" fill="#FCDD6B" stroke="#E2B94A" stroke-width="1.5"/><rect x="7" y="7" width="7" height="6" rx="1.5" fill="#FCDD6B" stroke="#E2B94A" stroke-width="1.5"/><rect x="18" y="7" width="7" height="6" rx="1.5" fill="#FCDD6B" stroke="#E2B94A" stroke-width="1.5"/></svg>`,
+  tap:`<svg viewBox="0 0 32 32" fill="none" stroke="#DB6A41" stroke-width="2.2" stroke-linecap="round"><circle cx="16" cy="12" r="5"/><path d="M16 17v11M11 24l5 4 5-4"/></svg>`,
+  drag:`<svg viewBox="0 0 32 32" fill="none" stroke="#DB6A41" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4v24M4 16h24M16 4l-4 4M16 4l4 4M16 28l-4-4M16 28l4-4M4 16l4-4M4 16l4 4M28 16l-4-4M28 16l-4 4"/></svg>`,
+  turn:`<svg viewBox="0 0 32 32" fill="none" stroke="#DB6A41" stroke-width="2.2" stroke-linecap="round"><path d="M25 16a9 9 0 1 1-3-6.7"/><path d="M23 4v6h-6"/></svg>`,
+  zoom:`<svg viewBox="0 0 32 32" fill="none" stroke="#DB6A41" stroke-width="2.2" stroke-linecap="round"><circle cx="14" cy="14" r="8"/><path d="M20 20l7 7M10 14h8M14 10v8"/></svg>`,
+  chat:`<svg viewBox="0 0 32 32"><path d="M5 7h22v14H14l-6 5v-5H5z" fill="#FFE1D2" stroke="#DB6A41" stroke-width="2" stroke-linejoin="round"/></svg>`,
+  book:`<svg viewBox="0 0 32 32"><path d="M4 8c4-2 8-2 12 1v17c-4-3-8-3-12-1zM28 8c-4-2-8-2-12 1v17c4-3 8-3 12-1z" fill="#fff" stroke="#DB6A41" stroke-width="2" stroke-linejoin="round"/></svg>`,
+  game:`<svg viewBox="0 0 32 32"><rect x="4" y="10" width="24" height="13" rx="6.5" fill="#E25C9A"/><path d="M10 14v5M7.5 16.5h5" stroke="#fff" stroke-width="2" stroke-linecap="round"/><circle cx="21" cy="15" r="1.6" fill="#fff"/><circle cx="24" cy="18" r="1.6" fill="#fff"/></svg>`,
+  radar:`<svg viewBox="0 0 32 32"><polygon points="16,3 28,12 24,27 8,27 4,12" fill="#FDF0E7" stroke="#E9D6C8"/><polygon points="16,8 24,13 21,23 11,22 9,13" fill="rgba(219,106,65,.35)" stroke="#DB6A41" stroke-width="2"/></svg>`,
+  log:`<svg viewBox="0 0 32 32"><rect x="7" y="4" width="18" height="24" rx="2.5" fill="#fff" stroke="#DB6A41" stroke-width="2"/><path d="M11 11h10M11 16h10M11 21h6" stroke="#DB6A41" stroke-width="2" stroke-linecap="round"/></svg>`,
+  heart:`<svg viewBox="0 0 32 32"><path d="M16 27C7 21 3 16.5 3 11.5a6.5 6.5 0 0 1 13-2 6.5 6.5 0 0 1 13 2C29 16.5 25 21 16 27z" fill="#E0393E"/></svg>`
+};
+const TUT=[
+  {t:"歡迎來到手語心島",intro:"這座島是用〈第六章 臺灣手語的教與學〉蓋起來的。一邊逛島、一邊和島民聊天，你會學到臺灣手語「怎麼教、怎麼學」。",
+   items:[[IC.hex("#DB6A41"),"九座島 ＝ 九節課","外圈八座島照第一到第八節排成一圈，中央的心島是第九節「結語」。"],
+          [IC.chat,"核心觀念","臺灣手語是自然的視覺語言。教學要從「語言功能」出發，而不是把華語逐字換成手勢。"],
+          [IC.heart,"最終目標","集滿外圈的積木，點亮心島，拿到島民證。"]]},
+  {t:"怎麼操作",intro:"滑鼠和手機觸控都可以玩。",
+   items:[[IC.tap,"點地面","你的小人（戴黃帽、標著「你」）會走過去。"],
+          [IC.chat,"點島民","小人會走到旁邊開始對話。"],
+          [IC.drag,"拖曳畫面","移動視角。手機用一指拖曳。"],
+          [IC.turn,"右鍵拖曳","旋轉視角。手機用兩指旋轉。"],
+          [IC.zoom,"滾輪縮放","拉近看告示牌、拉遠看全島。手機用兩指捏合。"]],
+   foot:"左上工具列：名牌（顯示島民名字）、跟隨（鏡頭跟著你）、鳥瞰（從正上方看）、暫停、切換白天／黃昏／夜晚。"},
+  {t:"看懂島上的記號",intro:"這些記號會告訴你，哪裡有東西可以學。",
+   items:[[IC.dia("#FCDD6B"),"黃色菱形","島民頭上有它，代表還有一題等你回答。答對後就會消失。"],
+          [IC.dia("#B8B0A8"),"灰色菱形","心島島主還沒解鎖，先完成外圈八座島。"],
+          [IC.site,"「待建造」工地","答對島民後，積木會從天上掉下來把它蓋好。"],
+          [IC.ring("#DB6A41"),"橘色六角圈＋小書","故事任務〈雞蛋與瓦片〉的下一段，走進圈裡就會開始。"],
+          [IC.ring("#3E9B5A"),"彩色六角圈＋招牌","小遊戲站，招牌上寫著遊戲名稱。"]]},
+  {t:"三種學習活動",intro:"題目和例句都取自本章內容，並附上頁碼方便回頭查書。",
+   items:[[IC.chat,"島民問答 · 32 位","選擇題，以及把詞卡排成臺灣手語語序的排序題，例如「工作 辛苦」「讀書 努力」。"],
+          [IC.book,"故事任務 · 4 段","照〈雞蛋與瓦片〉的段落功能，在家人村、句型市場、課文圖書館之間接力。第二段之後你會提著一籃雞蛋。"],
+          [IC.game,"小遊戲 · 4 個","句型拉霸機、對話練習（句型市場）、連連看（活動遊樂園）、語句拆合（課文圖書館）。"]]},
+  {t:"你的進度",intro:"右側面板會記錄你學到的一切，下次打開同一個瀏覽器還在。",
+   items:[[IC.brick,"積木 · 共 36 塊","答對一位島民或完成一個小遊戲，各得一塊。答過的可以複習，不會重複給積木。"],
+          [IC.log,"學習日誌","答對的題目、正確答案和解說都會收進這裡，故事任務的每一段也在。"],
+          [IC.radar,"五面向雷達圖","對應 p.207 的理解、形式、表達、互動、文化，看看自己哪一面還可以加強。"],
+          [IC.heart,"心島與島民證","外圈全部完成後，心島亮起；回答島主的最後一題，就能拿到島民證。"]]},
+  {t:"建議路線",intro:"照章節順序繞島一圈，最容易建立完整的概念。",
+   items:[[IC.hex("#D7322B"),"1–2 · 政策港、功能燈塔","先了解手語成為部定課程的背景，以及為什麼要從語言功能出發。"],
+          [IC.hex("#F2B705"),"3–5 · 家人村、句型市場、課文圖書館","詞彙、句型、課文三層教學。故事任務和三個小遊戲都在這一段。"],
+          [IC.hex("#12A0A8"),"6–8 · 遊樂園、文化村、觀測站","綜合活動、聾人文化，最後到觀測站看你的雷達圖。"],
+          [IC.heart,"9 · 心島","回到中央，回答島主的問題。"]],
+   last:true}
+];
+// shown on every visit until the viewer opts out; bump when the guide gains pages so everyone sees it again
+const TUT_VER=4;
+function tutorial(k){
+  const p=TUT[k];
+  const m=modal(`<div class="eyebrow">玩法說明 ${k+1}/${TUT.length}</div><h3 class="sec-title" style="margin-top:6px">${p.t}</h3><p class="prose" style="margin-top:6px;color:var(--muted);font-size:14px">${p.intro}</p>
+    <ul class="tut-list">${p.items.map(([ic,h,d])=>`<li><span class="tut-ic" aria-hidden="true">${ic}</span><div><b>${h}</b><span>${d}</span></div></li>`).join("")}</ul>
+    ${p.foot?`<p class="tut-foot">${p.foot}</p>`:""}
+    <div class="tut-dots">${TUT.map((_,i)=>`<i class="${i===k?"on":""}"></i>`).join("")}</div>
+    <label style="display:flex;align-items:center;gap:6px;margin-top:12px;font-size:13px;color:var(--muted)"><input type="checkbox" id="tutOff" ${prog.tut===TUT_VER?"checked":""}> 下次進來不要自動顯示</label>
+    <div class="row" style="justify-content:flex-end">${k>0?`<button class="btn ghost" id="pv">上一步</button>`:`<button class="btn ghost" id="sk">略過</button>`}${p.last?`<button class="btn ghost" id="sk2">自己逛逛</button><button class="btn" id="go">從政策港開始</button>`:`<button class="btn" id="nx">下一步</button>`}</div>`);
+  m.querySelector("#tutOff").onchange=e=>{prog.tut=e.target.checked?TUT_VER:false;save();};
+  const on=(id,f)=>{const b=m.querySelector(id);if(b)b.onclick=f;};
+  on("#sk",closeModal);on("#sk2",closeModal);
+  on("#pv",()=>tutorial(k-1));on("#nx",()=>tutorial(k+1));
+  on("#go",()=>{closeModal();openIsland(0);focusIsland(0);});
+}
+
+syncBuild(false);placeStory();syncBasket();
+renderPanel();
+if(camera.aspect<1){setPressed("tTags",false);labelsEl.classList.add("hide-tags");}
+if(prog.tut!==TUT_VER) tutorial(0);
+</script>
